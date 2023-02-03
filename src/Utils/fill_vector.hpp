@@ -27,8 +27,8 @@ std::vector<T> linspace(T x_min, T x_max, std::size_t number_points) {
         return list_x;
     }
     double dx = (x_max - x_min) / (number_points - 1);
-    for (std::size_t index_value = 0; index_value < number_points - 1; ++index_value) {
-        list_x.push_back(x_min + dx * index_value);
+    for (std::size_t index_value = 0; index_value < number_points; ++index_value) {
+        list_x[index_value] = x_min + dx * index_value;
     }
 
     return list_x;

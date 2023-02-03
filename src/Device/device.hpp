@@ -23,5 +23,19 @@ class device {
     doping_profile m_doping_profile;
 
  public:
-    device();
+    device() = default;
+    ~device() = default;
+
+    const doping_profile& get_doping_profile() const { return m_doping_profile; }
+
+    void add_doping_profile(doping_profile& doping_profile);
+    void setup_pin_diode(double      xlenght,
+                         std::size_t number_points,
+                         double      length_donor,
+                         double      length_intrinsic,
+                         double      donor_level,
+                         double      acceptor_level,
+                         double      intrisic_level);
+
+   void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
 };

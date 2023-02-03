@@ -52,7 +52,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
                                                  "MinSizeRel" "RelWithDebInfo")
   endif()
 
-  set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=-*,readability-*)
+  # set(CMAKE_CXX_CLANG_TIDY clang-tidy -checks=-*,readability-*)
 
   # Compiler tags
   enable_cxx_compiler_flag_if_supported("-Wall")
@@ -66,7 +66,32 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 endif()
 
+find_package(Eigen3 NO_MODULE)
+
+if(NOT Eigen3_FOUND)
+  set(EIGEN_BUILD_DOC OFF)
+  set(BUILD_TESTING OFF)
+  set(EIGEN_BUILD_PKGCONFIG OFF)
+  message("Fetching Eigen3 lib ...")
+  add_compile_definitions(EIGEN_USE_LAPACKE=0)
+  FetchContent_MakeAvailable(Eigen)
+endif()
+
+# Fetch fmt library
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt/
+  GIT_TAG 9.1.0)
+
+find_package(fmt CONFIG QUIET)
+if(NOT fmt_FOUND)
+  message("Fetching fmt lib ...")
+  FetchContent_MakeAvailable(fmt)
+endif()
+
+
 
 
 add_subdirectory(src/Utils)
 add_subdirectory(src/Device)
+add_subdirectory(apps/)

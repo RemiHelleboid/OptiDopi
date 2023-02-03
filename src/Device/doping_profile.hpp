@@ -16,6 +16,8 @@
 #include <random>
 #include <vector>
 
+constexpr double m3_to_cm3 = 1.0e6;
+
 class doping_profile {
  private:
     std::vector<double> m_x_line;
@@ -24,9 +26,14 @@ class doping_profile {
     std::vector<double> m_doping_concentration;
 
  public:
-    doping_profile();
+    doping_profile() = default;
     doping_profile(double x_min, double x_max, std::size_t number_points);
     doping_profile(const doping_profile&) = default;
+
+    std::vector<double> get_x_line() const { return m_x_line; }
+    std::vector<double> get_acceptor_concentration() const { return m_acceptor_concentration; }
+    std::vector<double> get_donor_concentration() const { return m_donor_concentration; }
+    std::vector<double> get_doping_concentration() const { return m_doping_concentration; }
 
     void re_compute_total_doping();
     void set_up_pin_diode(double      x_min,
@@ -37,4 +44,6 @@ class doping_profile {
                           double      donor_level,
                           double      acceptor_level,
                           double      intrisic_level);
+
+    void export_doping_profile(const std::string& filename) const;
 };
