@@ -17,13 +17,25 @@
 #include <vector>
 
 #include "doping_profile.hpp"
+#include "PoissonSolver.hpp"
+#include "McIntyre.hpp"
+
 
 class device {
  private:
     doping_profile m_doping_profile;
 
+    NewtonPoissonSolver m_poisson_solver;
+
+    std::vector<double>          m_list_voltages;
+    std::vector<PoissonSolution> m_list_poisson_solutions;
+
+    mcintyre::McIntyre m_mcintyre_solver;
+    std::vector<double> m_list_mcintyre_voltages;
+    std::vector<mcintyre::McIntyreSolution> m_list_mcintyre_solutions;
+
  public:
-    device() = default;
+    device()  = default;
     ~device() = default;
 
     const doping_profile& get_doping_profile() const { return m_doping_profile; }
@@ -37,5 +49,17 @@ class device {
                          double      acceptor_level,
                          double      intrisic_level);
 
-   void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
+    void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
+
+    void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
+    void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
+
+    const std::vector<double>& get_list_voltages() const { return m_list_voltages; }
+    const std::vector<PoissonSolution>& get_list_poisson_solutions() const { return m_list_poisson_solutions; }
+
+    void solve_mcintyre(const double voltage_step);
+    void export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const;
+
+
+
 };

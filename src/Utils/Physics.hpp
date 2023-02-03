@@ -14,6 +14,7 @@ constexpr double electron_mass          = 9.1093837015e-31;
 constexpr double boltzmann_constant_eV  = 8.617333262145e-5;
 constexpr double electron_mass_eV       = 0.5109989461e6;
 constexpr double vacuum_permittivity_eV = 1.0 / (4.0 * M_PI * 1e7);
+constexpr double reduced_planck         = 1.054571817e-34;
 
 
 constexpr double silicon_premitivity = 11.7;

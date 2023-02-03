@@ -4,22 +4,60 @@
 
 #include "PoissonSolver.hpp"
 
+#include <fmt/core.h>
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <sstream>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <random>
+#include <sstream>
 #include <vector>
-
-#include <fmt/core.h>
 
 #include "Physics.hpp"
 #include "doping_profile.hpp"
+#include "gradient.hpp"
+
+PoissonSolution::PoissonSolution(double              voltage,
+                                 std::vector<double> x_line,
+                                 std::vector<double> potential,
+                                 std::vector<double> electron_density,
+                                 std::vector<double> hole_density,
+                                 std::vector<double> electric_field)
+    : m_voltage(voltage),
+      m_x_line(x_line),
+      m_potential(potential),
+      m_electron_density(electron_density),
+      m_hole_density(hole_density),
+      m_electric_field(electric_field) {}
+
+PoissonSolution::PoissonSolution(double              voltage,
+                                 Eigen::VectorXd     x_line,
+                                 Eigen::VectorXd     potential,
+                                 Eigen::VectorXd     electron_density,
+                                 Eigen::VectorXd     hole_density,
+                                 std::vector<double> electric_field)
+    : m_voltage(voltage) {
+    m_x_line           = std::vector<double>(x_line.data(), x_line.data() + x_line.size());
+    m_potential        = std::vector<double>(potential.data(), potential.data() + potential.size());
+    m_electron_density = std::vector<double>(electron_density.data(), electron_density.data() + electron_density.size());
+    m_hole_density     = std::vector<double>(hole_density.data(), hole_density.data() + hole_density.size());
+    m_electric_field   = electric_field;
+}
+
+void PoissonSolution::export_to_file(const std::string& filename) const {
+    std::ofstream file(filename);
+    file << "X,Potential,eDensity,hDensity,ElectricField" << std::endl;
+    for (std::size_t i = 0; i < m_x_line.size(); ++i) {
+        file << m_x_line[i] << "," << m_potential[i] << "," << m_electron_density[i] << "," << m_hole_density[i] << ","
+             << m_electric_field[i] << std::endl;
+    }
+    file.close();
+}
 
 NewtonPoissonSolver::NewtonPoissonSolver(const Eigen::VectorXd& doping_concentration, const Eigen::VectorXd& x_line)
     : m_doping_concentration(doping_concentration),
@@ -36,7 +74,7 @@ NewtonPoissonSolver::NewtonPoissonSolver(const Eigen::VectorXd& doping_concentra
 NewtonPoissonSolver::NewtonPoissonSolver(const doping_profile& my_doping_profile) {
     constexpr double microns_to_meters = 1e-6;
     constexpr double m3_to_cm3         = 1e6;
-    std::size_t number_of_points = my_doping_profile.get_x_line().size();
+    std::size_t      number_of_points  = my_doping_profile.get_x_line().size();
     m_doping_concentration.resize(number_of_points);
     m_x_line.resize(number_of_points);
     for (std::size_t i = 0; i < number_of_points; ++i) {
@@ -44,6 +82,25 @@ NewtonPoissonSolver::NewtonPoissonSolver(const doping_profile& my_doping_profile
         m_x_line(i)               = my_doping_profile.get_x_line()[i] * microns_to_meters;
     }
 
+    m_matrix.resize(m_x_line.size(), m_x_line.size());
+    m_vector_rhs.resize(m_x_line.size());
+    m_solution.resize(m_x_line.size());
+    m_electron_density.resize(m_x_line.size());
+    m_hole_density.resize(m_x_line.size());
+    m_total_charge.resize(m_x_line.size());
+    m_derivative_total_charge.resize(m_x_line.size());
+}
+
+void NewtonPoissonSolver::set_doping_profile(const doping_profile& my_doping_profile) {
+    constexpr double microns_to_meters = 1e-6;
+    constexpr double m3_to_cm3         = 1e6;
+    std::size_t      number_of_points  = my_doping_profile.get_x_line().size();
+    m_doping_concentration.resize(number_of_points);
+    m_x_line.resize(number_of_points);
+    for (std::size_t i = 0; i < number_of_points; ++i) {
+        m_doping_concentration(i) = my_doping_profile.get_doping_concentration()[i] * m3_to_cm3;
+        m_x_line(i)               = my_doping_profile.get_x_line()[i] * microns_to_meters;
+    }
     m_matrix.resize(m_x_line.size(), m_x_line.size());
     m_vector_rhs.resize(m_x_line.size());
     m_solution.resize(m_x_line.size());
@@ -61,8 +118,7 @@ void NewtonPoissonSolver::compute_electron_density(const double applied_voltage)
 
 void NewtonPoissonSolver::compute_hole_density(const double applied_voltage) {
     for (int i = 0; i < m_x_line.size(); ++i) {
-        m_hole_density(i) =
-            m_intrisinc_carrier_concentration * std::exp((applied_voltage - m_solution(i)) / m_thermal_voltage);
+        m_hole_density(i) = m_intrisinc_carrier_concentration * std::exp((applied_voltage - m_solution(i)) / m_thermal_voltage);
     }
 }
 
@@ -173,8 +229,10 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     const double cathode_voltage = 0.0;
     const double doping_anode    = m_doping_concentration(0);
     const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
-    voltage_step = m_thermal_voltage;
+    voltage_step                 = m_thermal_voltage;
     fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
+
+    std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
 
     compute_initial_guess();
     compute_total_charge(cathode_voltage, anode_voltage);
@@ -189,8 +247,8 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
 
     std::size_t index_voltage_step = 0;
     while (anode_voltage <= final_anode_voltage) {
-        std::cout << "Voltage anode: " << anode_voltage << std::endl;
-        double residual = 1.0e10;
+        std::cout << "\rVoltage anode: " << anode_voltage << std::flush;
+        double      residual        = 1.0e10;
         std::size_t index_iteration = 0;
         while (residual > tolerance && index_iteration < max_iterations) {
             index_iteration++;
@@ -209,19 +267,47 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
             std::cout << "Maximum number of iterations reached" << std::endl;
             throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
         }
+        // Transform solution into std::vector
+        std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
+        std::vector<double> electric_field_vector = Utils::gradient(m_xline_vector, solution_vector);
+        constexpr double cm_to_m = 1.0e-2;
+        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double &value) { value *= cm_to_m; });
+        // Take absolute value of electric field
+        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double &value) { value = std::abs(value); });
+        PoissonSolution     solution(anode_voltage,
+                                 m_x_line,
+                                 m_solution,
+                                 m_electron_density,
+                                 m_hole_density,
+                                 electric_field_vector);
+        m_list_voltages.push_back(anode_voltage);
+        m_list_poisson_solutions.push_back(solution);
+
         index_voltage_step++;
         anode_voltage += voltage_step;
     }
 }
 
-void NewtonPoissonSolver::export_solution(const std::string& filename) const {
+void NewtonPoissonSolver::reset_all() {
+    m_list_voltages.clear();
+    m_list_poisson_solutions.clear();
+    m_solution.resize(0);
+    m_electron_density.resize(0);
+    m_hole_density.resize(0);
+    m_total_charge.resize(0);
+    m_derivative_total_charge.resize(0);
+    m_matrix.resize(0, 0);
+    m_vector_rhs.resize(0);
+}
+
+void NewtonPoissonSolver::export_current_solution(const std::string& filename) const {
     std::ofstream file(filename);
     if (file.is_open()) {
         file << "X,V,eDensity,hDensity" << std::endl;
         for (std::size_t idx_x = 0; idx_x < m_x_line.size(); ++idx_x) {
-            file << m_x_line(idx_x) << "," << m_solution(idx_x) << "," << m_electron_density(idx_x) << ","
-                 << m_hole_density(idx_x) << std::endl;
+            file << m_x_line(idx_x) << "," << m_solution(idx_x) << "," << m_electron_density(idx_x) << "," << m_hole_density(idx_x)
+                 << std::endl;
         }
-    file.close();
+        file.close();
     }
 }

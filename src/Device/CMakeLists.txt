@@ -1,6 +1,5 @@
-set(HEADER_FILES_LIBDEVICE "doping_profile.hpp" "device.hpp" "PoissonSolver.hpp")
-
-set(SOURCE_FILES_LIBDEVICE "doping_profile.cpp" "device.cpp" "PoissonSolver.cpp")
+set(HEADER_FILES_LIBDEVICE "doping_profile.hpp" "device.hpp" "PoissonSolver.hpp" "ImpactIonization.hpp" "McIntyre.hpp")
+set(SOURCE_FILES_LIBDEVICE "doping_profile.cpp" "device.cpp" "PoissonSolver.cpp" "McIntyre.cpp")
 
 
 add_library(libdevice STATIC ${SOURCE_FILES_LIBDEVICE} ${HEADER_FILES_LIBDEVICE})

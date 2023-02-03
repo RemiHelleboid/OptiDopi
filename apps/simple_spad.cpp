@@ -10,13 +10,18 @@
 
 int main(int argc, char** argv) {
     device my_device;
-    my_device.setup_pin_diode(10.0, 1000, 1.0, 0.0, 1.0e19, 1.0e15, 1.0e10);
+    my_device.setup_pin_diode(10.0, 500, 2.0, 0.0, 1.0e19, 5.0e16, 1.0e10);
     my_device.export_doping_profile("doping_profile.csv");
-    NewtonPoissonSolver poisson_solver(my_device.get_doping_profile());
-    double              target_anode_voltage = 20.0;
+    double              target_anode_voltage = 40.0;
     double              tol                  = 1.0e-6;
     const int           max_iter             = 100;
     double              voltage_step         = 0.01;
-    poisson_solver.newton_solver(target_anode_voltage, tol, max_iter, voltage_step);
+    my_device.solve_poisson(target_anode_voltage, tol, max_iter);
+    my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
+
+    double mcintyre_voltage_step = 0.5;
+    my_device.solve_mcintyre(voltage_step);
+    my_device.export_mcintyre_solution("mcintyre_solution", "MCI_");
+
     fmt::print("End of the program {}.\n", argv[0]);
 }
