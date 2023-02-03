@@ -49,7 +49,7 @@ void device::solve_mcintyre(const double voltage_step) {
         index_step = 1;
     }
     std::cout << "index_step = " << index_step << std::endl;
-    const double micron_to_cm = 1.0e-4;
+    const double        micron_to_cm = 1.0e-4;
     std::vector<double> x_line_cm(m_doping_profile.get_x_line());
     for (auto& x : x_line_cm) {
         x *= micron_to_cm;
@@ -64,6 +64,25 @@ void device::solve_mcintyre(const double voltage_step) {
         m_list_mcintyre_voltages.push_back(m_list_voltages[idx_voltage]);
         m_list_mcintyre_solutions.push_back(m_mcintyre_solver.get_solution());
     }
+}
+
+std::vector<double> device::get_list_total_breakdown_probability() const {
+    std::vector<double> list_total_breakdown_probability;
+    for (const auto& mcintyre_solution : m_list_mcintyre_solutions) {
+        list_total_breakdown_probability.push_back(mcintyre_solution.total_breakdown_probability.back());
+    }
+    return list_total_breakdown_probability;
+}
+
+double device::extract_breakdown_voltage(double brp_threshold) const {
+    std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
+    auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double& voltage) {
+        return voltage > brp_threshold;
+    });
+    if (it_bv == list_total_breakdown_probability.end()) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    return m_list_mcintyre_voltages[std::distance(list_total_breakdown_probability.begin(), it_bv)];
 }
 
 void device::export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const {
@@ -81,7 +100,7 @@ void device::export_mcintyre_solution(const std::string& directory_name, const s
         }
         file.close();
     }
-    std::string   filename_global_brp = fmt::format("{}/{}_GlobalBRP_.csv", directory_name, prefix);
+    std::string   filename_global_brp = fmt::format("{}/Glob_{}_GlobalBRP_.csv", directory_name, prefix);
     std::ofstream file(filename_global_brp);
     file << "Voltage,MeanBreakdownProbability" << std::endl;
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_mcintyre_voltages.size(); ++idx_voltage) {

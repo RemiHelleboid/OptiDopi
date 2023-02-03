@@ -22,6 +22,9 @@ int main(int argc, char** argv) {
     double mcintyre_voltage_step = 0.5;
     my_device.solve_mcintyre(voltage_step);
     my_device.export_mcintyre_solution("mcintyre_solution", "MCI_");
+    const double brp_threshold = 1e-3;
+    double BV = my_device.extract_breakdown_voltage(brp_threshold);
+    fmt::print("Breakdown voltage: {} V (threshold = {})\n", BV, brp_threshold);
 
     fmt::print("End of the program {}.\n", argv[0]);
 }
