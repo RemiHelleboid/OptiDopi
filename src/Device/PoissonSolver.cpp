@@ -163,13 +163,6 @@ void NewtonPoissonSolver::compute_right_hand_side() {
     // Boundary conditions
     m_vector_rhs(0)                   = 0.0;
     m_vector_rhs(m_x_line.size() - 1) = 0.0;
-
-    // Export the right hand side to a file
-    std::ofstream file("rhs.csv");
-    for (std::size_t index_x = 0; index_x < m_x_line.size(); ++index_x) {
-        file << m_x_line(index_x) << "," << m_vector_rhs(index_x) << std::endl;
-    }
-    file.close();
 }
 
 void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
@@ -180,30 +173,19 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     const double cathode_voltage = 0.0;
     const double doping_anode    = m_doping_concentration(0);
     const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
+    voltage_step = m_thermal_voltage;
+    fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
 
     compute_initial_guess();
     compute_total_charge(cathode_voltage, anode_voltage);
-    // Export the total charge to a file
-    std::ofstream file("total_charge.csv");
-    for (std::size_t index_x = 0; index_x < m_x_line.size(); ++index_x) {
-        file << m_x_line(index_x) << "," << m_total_charge(index_x) << std::endl;
-    }
-    file.close();
     compute_derivative_total_charge(cathode_voltage, anode_voltage);
     compute_matrix();
     update_matrix();
     compute_right_hand_side();
-    // Export the right hand side to a file
-    std::ofstream file_rhs("rhs000.csv");
-    for (std::size_t index_x = 0; index_x < m_x_line.size(); ++index_x) {
-        file_rhs << m_x_line(index_x) << "," << m_vector_rhs(index_x) << std::endl;
-    }
-    file_rhs.close();
     m_solver.analyzePattern(m_matrix);
 
     Eigen::VectorXd m_new_solution(m_x_line.size());
     const double    lambda = 1.0;
-
 
     std::size_t index_voltage_step = 0;
     while (anode_voltage <= final_anode_voltage) {
@@ -229,11 +211,6 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
         }
         index_voltage_step++;
         anode_voltage += voltage_step;
-        // Fill index with zeros at the begining for filename
-        std::ostringstream index_paded;
-        index_paded << std::setw(6) << std::setfill('0') << index_voltage_step;
-        std::string filename = "RES/solution_" + index_paded.str() + ".csv";
-        export_solution(filename);
     }
 }
 
