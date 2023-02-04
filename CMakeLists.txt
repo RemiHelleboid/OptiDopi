@@ -77,6 +77,10 @@ if(NOT Eigen3_FOUND)
   FetchContent_MakeAvailable(Eigen)
 endif()
 
+# Find OpenMP
+find_package(OpenMP REQUIRED)
+
+
 # Fetch fmt library
 FetchContent_Declare(
   fmt

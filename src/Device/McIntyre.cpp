@@ -201,7 +201,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
     Eigen::SparseLU<Eigen::SparseMatrix<double> > EigenSolver;
     EigenSolver.analyzePattern(MAT);
-    int    MaxEpoch = 10000;
+    int    MaxEpoch = 250;
     double factor   = 1.0;
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         MAT = assembleMat();
@@ -211,7 +211,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
             mSolverHasConverged = false;
             factor *= 0.5;
             initial_guess(factor);
-            std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
+            // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
             epoch++;
         } else {
             W             = EigenSolver.solve(B);
@@ -224,7 +224,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
-        std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl << std::endl << std::endl;
+        // std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl << std::endl << std::endl;
         mBreakdownP                 = Eigen::VectorXd::Zero(2 * N);
         m_eBreakdownProbability     = std::vector<double>(N, 0.0);
         m_hBreakdownProbability     = std::vector<double>(N, 0.0);

@@ -57,7 +57,7 @@ class device {
     const std::vector<double>& get_list_voltages() const { return m_list_voltages; }
     const std::vector<PoissonSolution>& get_list_poisson_solutions() const { return m_list_poisson_solutions; }
 
-    void solve_mcintyre(const double voltage_step);
+    void solve_mcintyre(const double voltage_step, double stop_at_bv_plus=1e10);
     std::vector<double> get_list_total_breakdown_probability() const;
     void export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const;
     double extract_breakdown_voltage(double brp_threshold) const;

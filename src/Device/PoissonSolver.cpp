@@ -230,7 +230,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     const double doping_anode    = m_doping_concentration(0);
     const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
     voltage_step                 = m_thermal_voltage;
-    fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
+    // fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
 
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
 
@@ -247,7 +247,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
 
     std::size_t index_voltage_step = 0;
     while (anode_voltage <= final_anode_voltage) {
-        std::cout << "\rVoltage anode: " << anode_voltage << std::flush;
+        // std::cout << "\rVoltage anode: " << anode_voltage << std::flush;
         double      residual        = 1.0e10;
         std::size_t index_iteration = 0;
         while (residual > tolerance && index_iteration < max_iterations) {

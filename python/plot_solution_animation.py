@@ -17,7 +17,7 @@ def animation_sol(DIR):
     list_voltage = []
     # Extract the voltage from the file name by using regular expression
     for file in list_files:
-        voltage = re.findall(r'\d+', file)
+        voltage = re.findall(r"[-+]?\d*\.\d+|\d+", file)
         list_voltage.append(float(voltage[0]))
     list_voltage = np.array(list_voltage)
     # Sort the list of files according to the voltage
@@ -30,7 +30,7 @@ def animation_sol(DIR):
         listU.append(U)
         listeDensity.append(eDensity)
         listhDensity.append(hDensity)
-        listEF.append(np.abs(ElectricField))
+        listEF.append(ElectricField)
     line1, = ax.plot(listX[0], listU[0], 'r-')
     line2, = ax_eff.plot(listX[0], listEF[0], 'b-')
     ax.set_ylabel('U')

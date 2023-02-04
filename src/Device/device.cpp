@@ -43,26 +43,32 @@ void device::export_poisson_solution(const std::string& directory_name, const st
     std::cout << "Exporting the poisson solution to the directory " << directory_name << " done." << std::endl;
 }
 
-void device::solve_mcintyre(const double voltage_step) {
-    std::size_t index_step = (m_list_voltages[1] - m_list_voltages[0]) / voltage_step;
+void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
+    double index_step = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
+    int   index_step_int = int(index_step);
     if (index_step == 0) {
         index_step = 1;
     }
-    std::cout << "index_step = " << index_step << std::endl;
     const double        micron_to_cm = 1.0e-4;
     std::vector<double> x_line_cm(m_doping_profile.get_x_line());
     for (auto& x : x_line_cm) {
         x *= micron_to_cm;
     }
-    std::cout << "total length = " << x_line_cm.back() << " cm" << std::endl;
     m_mcintyre_solver.set_xline(x_line_cm);
     double tol = 1e-9;
+    double breakdown_voltage = 0.0;
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step) {
-        std::cout << "Solving McIntyre for voltage = " << m_list_voltages[idx_voltage] << std::endl;
+        // std::cout << "Solving McIntyre for voltage = " << m_list_voltages[idx_voltage] << std::endl;
         m_mcintyre_solver.set_electric_field(m_list_poisson_solutions[idx_voltage].m_electric_field);
         m_mcintyre_solver.ComputeDampedNewtonSolution(tol);
         m_list_mcintyre_voltages.push_back(m_list_voltages[idx_voltage]);
         m_list_mcintyre_solutions.push_back(m_mcintyre_solver.get_solution());
+        if (m_list_mcintyre_solutions.back().m_mean_breakdown_probability > 1e-3 && breakdown_voltage == 0.0) {
+            breakdown_voltage = m_list_voltages[idx_voltage];
+        }
+        if (m_list_voltages[idx_voltage] > breakdown_voltage + stop_at_bv_plus && breakdown_voltage != 0.0) {
+            break;
+        }
     }
 }
 
