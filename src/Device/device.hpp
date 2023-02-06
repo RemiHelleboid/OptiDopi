@@ -16,10 +16,9 @@
 #include <random>
 #include <vector>
 
-#include "doping_profile.hpp"
-#include "PoissonSolver.hpp"
 #include "McIntyre.hpp"
-
+#include "PoissonSolver.hpp"
+#include "doping_profile.hpp"
 
 class device {
  private:
@@ -30,8 +29,8 @@ class device {
     std::vector<double>          m_list_voltages;
     std::vector<PoissonSolution> m_list_poisson_solutions;
 
-    mcintyre::McIntyre m_mcintyre_solver;
-    std::vector<double> m_list_mcintyre_voltages;
+    mcintyre::McIntyre                      m_mcintyre_solver;
+    std::vector<double>                     m_list_mcintyre_voltages;
     std::vector<mcintyre::McIntyreSolution> m_list_mcintyre_solutions;
 
  public:
@@ -54,14 +53,13 @@ class device {
     void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
 
-    const std::vector<double>& get_list_voltages() const { return m_list_voltages; }
+    const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }
     const std::vector<PoissonSolution>& get_list_poisson_solutions() const { return m_list_poisson_solutions; }
+    std::vector<double>                 get_list_depletion_width() const;
+    void                                export_depletion_width(const std::string& directory_name, const std::string& prefix) const;
 
-    void solve_mcintyre(const double voltage_step, double stop_at_bv_plus=1e10);
+    void                solve_mcintyre(const double voltage_step, double stop_at_bv_plus = 1e10);
     std::vector<double> get_list_total_breakdown_probability() const;
-    void export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const;
-    double extract_breakdown_voltage(double brp_threshold) const;
-
-
-
+    void                export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const;
+    double              extract_breakdown_voltage(double brp_threshold) const;
 };

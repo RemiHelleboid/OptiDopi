@@ -60,10 +60,14 @@ class NewtonPoissonSolver {
     std::vector<double>          m_list_voltages;
     std::vector<PoissonSolution> m_list_poisson_solutions;
 
+    static double m_poisson_solver_time;
+
  public:
     NewtonPoissonSolver() = default;
     NewtonPoissonSolver(const Eigen::VectorXd& doping_concentration, const Eigen::VectorXd& x_line);
     NewtonPoissonSolver(const doping_profile& my_doping_profile);
+
+    static double get_poisson_solver_time() { return m_poisson_solver_time; }
 
     void set_doping_profile(const doping_profile& my_doping_profile);
 
@@ -80,6 +84,9 @@ class NewtonPoissonSolver {
     void   compute_right_hand_side();
 
     void newton_solver(const double final_anode_voltage, const double tolerance, const int max_iterations, double voltage_step);
+
+    double              get_depletion_width(const double epsilon) const;
+    std::vector<double> get_list_depletion_width(const double epsilon) const;
 
     std::vector<double>          get_list_voltages() const { return m_list_voltages; }
     std::vector<PoissonSolution> get_list_poisson_solutions() const { return m_list_poisson_solutions; }

@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -21,6 +22,48 @@
 #include "Physics.hpp"
 #include "doping_profile.hpp"
 #include "gradient.hpp"
+#include "smoother.hpp"
+
+
+double NewtonPoissonSolver::m_poisson_solver_time = 0.0;
+
+double compute_depletion_width(const Eigen::VectorXd& electron_density,
+                               const Eigen::VectorXd& x_line,
+                               const Eigen::VectorXd& hole_density,
+                               const Eigen::VectorXd& doping_concentration,
+                               const double           epsilon) {
+    constexpr double m3_to_cm3 = 1.0e6;
+    Eigen::VectorXd depletion_shape     = electron_density - hole_density;
+    std::size_t     sum_depleted_points = 0;
+    for (unsigned int idx_x = 0; idx_x < x_line.size(); ++idx_x) {
+        depletion_shape(idx_x) /= doping_concentration(idx_x) * m3_to_cm3;
+        depletion_shape(idx_x) = fabs(depletion_shape(idx_x));
+        if (depletion_shape(idx_x) < epsilon) {
+            sum_depleted_points++;
+        }
+    }
+    return 0.0;
+}
+double compute_depletion_width(const std::vector<double>& x_line,
+                               const std::vector<double>& electron_density,
+                               const std::vector<double>& hole_density,
+                               const std::vector<double>& doping_concentration,
+                               const double               epsilon) {
+    std::size_t         sum_depleted_points = 0;
+    std::vector<double> depletion_shape(x_line.size());
+    constexpr double    m3_to_cm3 = 1.0e6;
+    for (unsigned int idx_x = 0; idx_x < x_line.size(); ++idx_x) {
+        depletion_shape[idx_x] = electron_density[idx_x] - hole_density[idx_x];
+        depletion_shape[idx_x] /= (doping_concentration[idx_x] * m3_to_cm3);
+        depletion_shape[idx_x] = fabs(depletion_shape[idx_x]);
+        if (depletion_shape[idx_x] < epsilon) {
+            sum_depleted_points++;
+        }
+    }
+    double dx = x_line[1] - x_line[0];
+    std::cout << "Depletion width: " << sum_depleted_points * dx << " m" << std::endl;
+    return sum_depleted_points * dx;
+}
 
 PoissonSolution::PoissonSolution(double              voltage,
                                  std::vector<double> x_line,
@@ -225,11 +268,13 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
                                         const double tolerance,
                                         const int    max_iterations,
                                         double       voltage_step) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     double       anode_voltage   = 0.0;
     const double cathode_voltage = 0.0;
     const double doping_anode    = m_doping_concentration(0);
     const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
-    voltage_step                 = m_thermal_voltage;
+    voltage_step                 = 3.0 * m_thermal_voltage;
     // fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
 
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
@@ -270,22 +315,39 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
         // Transform solution into std::vector
         std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
         std::vector<double> electric_field_vector = Utils::gradient(m_xline_vector, solution_vector);
-        constexpr double cm_to_m = 1.0e-2;
-        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double &value) { value *= cm_to_m; });
+        constexpr double    cm_to_m               = 1.0e-2;
+        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value *= cm_to_m; });
         // Take absolute value of electric field
-        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double &value) { value = std::abs(value); });
-        PoissonSolution     solution(anode_voltage,
-                                 m_x_line,
-                                 m_solution,
-                                 m_electron_density,
-                                 m_hole_density,
-                                 electric_field_vector);
+        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::abs(value); });
+        PoissonSolution solution(anode_voltage, m_x_line, m_solution, m_electron_density, m_hole_density, electric_field_vector);
         m_list_voltages.push_back(anode_voltage);
         m_list_poisson_solutions.push_back(solution);
 
         index_voltage_step++;
         anode_voltage += voltage_step;
     }
+    auto                          end             = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    m_poisson_solver_time += elapsed_seconds.count();
+}
+
+double NewtonPoissonSolver::get_depletion_width(const double epsilon) const {
+    return compute_depletion_width(m_x_line, m_electron_density, m_hole_density, m_doping_concentration, epsilon);
+}
+
+std::vector<double> NewtonPoissonSolver::get_list_depletion_width(const double epsilon) const {
+    std::vector<double> vect_doping_concentration(m_doping_concentration.data(),
+                                                  m_doping_concentration.data() + m_doping_concentration.size());
+    std::vector<double> list_depletion_width;
+    for (const auto& solution : m_list_poisson_solutions) {
+        list_depletion_width.push_back(compute_depletion_width(solution.m_x_line,
+                                                               solution.m_electron_density,
+                                                               solution.m_hole_density,
+                                                               vect_doping_concentration,
+                                                               epsilon));
+    }
+    std::vector<double> smoothed_depletions = Utils::convol_square(list_depletion_width, 5);
+    return smoothed_depletions;
 }
 
 void NewtonPoissonSolver::reset_all() {

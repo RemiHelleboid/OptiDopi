@@ -14,6 +14,8 @@
 
 namespace mcintyre {
 
+double McIntyre::m_McIntyre_time = 0.0;
+
 McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperature(temperature), m_xline(x_line) {
     mBreakdownP         = Eigen::VectorXd::Zero(2 * m_xline.size());
     mSolverHasConverged = false;
@@ -188,13 +190,10 @@ void McIntyre::initial_guess(double factor) {
  *
  *  \return std::vector<double> The computed solution of the system. */
 void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
-    std::size_t N      = m_xline.size();
-    double      Norm_w = 1e10;
-    int         epoch  = 0;
-    // double          lambda_min = 1e-2;
-    // double          sigma      = 0.01;
-    // double          tau        = 0.1;
-    // double          g_0(0);
+    auto                                          start  = std::chrono::high_resolution_clock::now();
+    std::size_t                                   N      = m_xline.size();
+    double                                        Norm_w = 1e10;
+    int                                           epoch  = 0;
     Eigen::VectorXd                               W(2 * N);
     Eigen::VectorXd                               W_new(2 * N);
     Eigen::SparseMatrix<double>                   MAT = assembleMat();
@@ -225,10 +224,13 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
         // std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl << std::endl << std::endl;
-        mBreakdownP                 = Eigen::VectorXd::Zero(2 * N);
-        m_eBreakdownProbability     = std::vector<double>(N, 0.0);
-        m_hBreakdownProbability     = std::vector<double>(N, 0.0);
-        m_totalBreakdownProbability = std::vector<double>(N, 0.0);
+        mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
+        m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
+        m_hBreakdownProbability                       = std::vector<double>(N, 0.0);
+        m_totalBreakdownProbability                   = std::vector<double>(N, 0.0);
+        auto                          end             = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end - start;
+        m_McIntyre_time += elapsed_seconds.count();
         return;
     } else {
         mSolverHasConverged = true;
@@ -250,6 +252,9 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         m_hBreakdownProbability     = hBrPVector;
         m_totalBreakdownProbability = BrPVector;
     }
+    auto                          end             = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    m_McIntyre_time += elapsed_seconds.count();
 }
 
 double McIntyre::get_mean_total_breakdown_probability() const {

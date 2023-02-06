@@ -19,6 +19,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <chrono>
 #include <vector>
 
 #include "ImpactIonization.hpp"
@@ -58,11 +59,15 @@ class McIntyre {
     //! Flag to know the status of the convergence
     bool mSolverHasConverged = false;
 
+    static double m_McIntyre_time;
+
  public:
     McIntyre() = default;
     McIntyre(std::vector<double> x_line, std::vector<double> electric_field, double temperature = 300.0);
     McIntyre(std::vector<double> x_line, double temperature = 300.0);
     ~McIntyre(){};
+
+    static double get_mcintyre_time() { return m_McIntyre_time; }
 
     void set_xline(std::vector<double> x_line);
     void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess=true);

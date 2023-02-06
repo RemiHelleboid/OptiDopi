@@ -5,11 +5,16 @@
 #include "device.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
+#include <fmt/xchar.h>
 
 #include <filesystem>
 #include <iostream>
 
 #include "gradient.hpp"
+#include "interpolation.hpp"
 
 void device::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
 
@@ -46,6 +51,7 @@ void device::export_poisson_solution(const std::string& directory_name, const st
 void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     double index_step = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
     int   index_step_int = int(index_step);
+    std::cout << "index_step = " << index_step << std::endl;
     if (index_step == 0) {
         index_step = 1;
     }
@@ -71,6 +77,21 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
         }
     }
 }
+
+void device::export_depletion_width(const std::string& directory_name, const std::string& prefix) const {
+    const double epsilon = 1e-9;
+    std::vector<double> list_total_breakdown_probability = m_poisson_solver.get_list_depletion_width(epsilon);
+    std::filesystem::create_directories(directory_name);
+    std::ofstream file;
+    file.open(fmt::format("{}/{}.csv", directory_name, prefix));
+
+    fmt::print(file, "Voltage,DepletionWidth\n");
+    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
+        fmt::print(file, "{:.3f},{:.3e}\n", m_list_voltages[idx_voltage], list_total_breakdown_probability[idx_voltage]);
+    }
+    file.close();
+}
+
 
 std::vector<double> device::get_list_total_breakdown_probability() const {
     std::vector<double> list_total_breakdown_probability;
