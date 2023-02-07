@@ -15,7 +15,7 @@
 int main(int argc, char** argv) {
     const std::string OUTDIR = "output/";
     device my_device;
-    my_device.setup_pin_diode(10.0, 500, 2.0, 0.0, 1.0e19, 5.0e16, 1.0e10);
+    my_device.setup_pin_diode(10.0, 500, 2.0, 0.0, 1.0e19, 5.0e17, 1.0e10);
     my_device.export_doping_profile("doping_profile.csv");
     double              target_anode_voltage = 40.0;
     double              tol                  = 1.0e-6;
@@ -31,6 +31,14 @@ int main(int argc, char** argv) {
     double BV = my_device.extract_breakdown_voltage(brp_threshold);
     fmt::print("Breakdown voltage: {} V (threshold = {})\n", BV, brp_threshold);
     my_device.export_depletion_width(OUTDIR, "depletion_width.csv");
+
+    double BiasAboveBV = 3.0;
+    double BrP_at_Biasing = my_device.get_brp_at_voltage(BV + BiasAboveBV);
+    double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV);
+
+    fmt::print("Biasing voltage: {} V \n", BV + BiasAboveBV);
+    fmt::print("\t- Breakdown Probability: {} \n", BrP_at_Biasing);
+    fmt::print("\t- Depletion width: {} um \n", DepletionWidth_at_Biasing * 1e6);
 
 
     double poisson_time = NewtonPoissonSolver::get_poisson_solver_time();

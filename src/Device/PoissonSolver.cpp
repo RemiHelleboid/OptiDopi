@@ -61,7 +61,6 @@ double compute_depletion_width(const std::vector<double>& x_line,
         }
     }
     double dx = x_line[1] - x_line[0];
-    std::cout << "Depletion width: " << sum_depleted_points * dx << " m" << std::endl;
     return sum_depleted_points * dx;
 }
 

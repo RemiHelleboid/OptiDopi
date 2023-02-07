@@ -136,3 +136,15 @@ void device::export_mcintyre_solution(const std::string& directory_name, const s
     }
     std::cout << "Exporting the McIntyre solution to the directory " << directory_name << " done." << std::endl;
 }
+
+double device::get_brp_at_voltage(double voltage) const {
+    double interpolated_brp = Utils::interp1d(m_list_mcintyre_voltages, get_list_total_breakdown_probability(), voltage);
+    return interpolated_brp;
+}
+
+double device::get_depletion_at_voltage(double voltage) const {
+    double epsilon = 1e-8;
+    double interpolated_depletion = Utils::interp1d(m_list_voltages, m_poisson_solver.get_list_depletion_width(epsilon), voltage);
+    return interpolated_depletion;
+}
+

@@ -62,4 +62,7 @@ class device {
     std::vector<double> get_list_total_breakdown_probability() const;
     void                export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const;
     double              extract_breakdown_voltage(double brp_threshold) const;
+
+    double get_brp_at_voltage(double voltage) const;
+    double get_depletion_at_voltage(double voltage)const ;
 };
