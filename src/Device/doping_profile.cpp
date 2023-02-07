@@ -18,14 +18,19 @@
 
 
 #include "doping_profile.hpp"
-
 #include "fill_vector.hpp"
+
+#include "smoother.hpp"
 
 doping_profile::doping_profile(double x_min, double x_max, std::size_t number_points)
     : m_x_line(utils::linspace(x_min, x_max, number_points)),
       m_acceptor_concentration(number_points, 0.0),
       m_donor_concentration(number_points, 0.0) {
     re_compute_total_doping();
+}
+
+void doping_profile::smooth_doping_profile(int window_size) {
+    m_doping_concentration == Utils::convol_square(m_doping_concentration, window_size);
 }
 
 void doping_profile::re_compute_total_doping() {

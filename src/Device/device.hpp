@@ -49,6 +49,7 @@ class device {
                          double      intrisic_level);
 
     void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
+    void smooth_doping_profile(int window_size);
 
     void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;

@@ -30,6 +30,8 @@ class doping_profile {
     doping_profile(double x_min, double x_max, std::size_t number_points);
     doping_profile(const doping_profile&) = default;
 
+    void smooth_doping_profile(int window_size);
+
     std::vector<double> get_x_line() const { return m_x_line; }
     std::vector<double> get_acceptor_concentration() const { return m_acceptor_concentration; }
     std::vector<double> get_donor_concentration() const { return m_donor_concentration; }

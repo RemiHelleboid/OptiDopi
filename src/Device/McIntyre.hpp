@@ -52,6 +52,9 @@ class McIntyre {
        StreamLine->GlobalLine[k] */
     Eigen::VectorXd mBreakdownP;
 
+    // Same format
+    Eigen::VectorXd m_InitialGuessBreakdownP;
+
     // Final breakdown probability
     std::vector<double> m_totalBreakdownProbability;
     std::vector<double> m_eBreakdownProbability;
@@ -70,7 +73,7 @@ class McIntyre {
     static double get_mcintyre_time() { return m_McIntyre_time; }
 
     void set_xline(std::vector<double> x_line);
-    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess=true);
+    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess=false);
 
     double                      dPe_func(double Pe, double Ph, int index);
     double                      dPh_func(double Pe, double Ph, int index);

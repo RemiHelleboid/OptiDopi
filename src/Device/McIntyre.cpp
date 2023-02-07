@@ -17,8 +17,9 @@ namespace mcintyre {
 double McIntyre::m_McIntyre_time = 0.0;
 
 McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperature(temperature), m_xline(x_line) {
-    mBreakdownP         = Eigen::VectorXd::Zero(2 * m_xline.size());
-    mSolverHasConverged = false;
+    mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
+    m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
+    mSolverHasConverged      = false;
     m_eRateImpactIonization.resize(m_xline.size());
     m_hRateImpactIonization.resize(m_xline.size());
     const double Gamma = compute_gamma(m_temperature);
@@ -30,10 +31,11 @@ McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperatu
 }
 
 McIntyre::McIntyre(std::vector<double> x_line, std::vector<double> electric_field, double temperature) : m_temperature(temperature) {
-    m_xline             = x_line;
-    m_electric_field    = electric_field;
-    mBreakdownP         = Eigen::VectorXd::Zero(2 * m_xline.size());
-    mSolverHasConverged = false;
+    m_xline                  = x_line;
+    m_electric_field         = electric_field;
+    mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
+    m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
+    mSolverHasConverged      = false;
     m_eRateImpactIonization.resize(m_xline.size());
     m_hRateImpactIonization.resize(m_xline.size());
     const double Gamma = compute_gamma(m_temperature);
@@ -46,9 +48,10 @@ McIntyre::McIntyre(std::vector<double> x_line, std::vector<double> electric_fiel
 }
 
 void McIntyre::set_xline(std::vector<double> x_line) {
-    m_xline             = x_line;
-    mBreakdownP         = Eigen::VectorXd::Zero(2 * m_xline.size());
-    mSolverHasConverged = false;
+    m_xline                  = x_line;
+    mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
+    m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
+    mSolverHasConverged      = false;
     m_eRateImpactIonization.resize(m_xline.size());
     m_hRateImpactIonization.resize(m_xline.size());
 }
@@ -58,6 +61,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
     m_electric_field   = electric_field;
+
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);
     for (std::size_t idx_x = 0; idx_x < m_xline.size(); idx_x++) {
@@ -181,8 +185,8 @@ void McIntyre::initial_guess(double factor) {
     auto   index_max_electric_field      = std::max_element(m_electric_field.begin(), m_electric_field.end());
     double length_peack_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
     for (int i = 0; i < NbPoints; i++) {
-        mBreakdownP[2 * i]     = factor * 0.8 * (m_xline[i] >= length_peack_triggering_force);
-        mBreakdownP[2 * i + 1] = factor * 0.4 * (m_xline[i] < length_peack_triggering_force);
+        m_InitialGuessBreakdownP[2 * i]     = factor * 0.8 * (m_xline[i] >= length_peack_triggering_force);
+        m_InitialGuessBreakdownP[2 * i + 1] = factor * 0.4 * (m_xline[i] < length_peack_triggering_force);
     }
 }
 
@@ -190,12 +194,13 @@ void McIntyre::initial_guess(double factor) {
  *
  *  \return std::vector<double> The computed solution of the system. */
 void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
-    auto                                          start  = std::chrono::high_resolution_clock::now();
-    std::size_t                                   N      = m_xline.size();
-    double                                        Norm_w = 1e10;
-    int                                           epoch  = 0;
-    Eigen::VectorXd                               W(2 * N);
-    Eigen::VectorXd                               W_new(2 * N);
+    auto            start  = std::chrono::high_resolution_clock::now();
+    std::size_t     N      = m_xline.size();
+    double          Norm_w = 1e10;
+    int             epoch  = 0;
+    Eigen::VectorXd W(2 * N);
+    Eigen::VectorXd W_new(2 * N);
+    mBreakdownP                                       = m_InitialGuessBreakdownP;
     Eigen::SparseMatrix<double>                   MAT = assembleMat();
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
     Eigen::SparseLU<Eigen::SparseMatrix<double> > EigenSolver;
@@ -223,7 +228,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
-        // std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl << std::endl << std::endl;
+        std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
         mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
         m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
         m_hBreakdownProbability                       = std::vector<double>(N, 0.0);
@@ -233,7 +238,8 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         m_McIntyre_time += elapsed_seconds.count();
         return;
     } else {
-        mSolverHasConverged = true;
+        mSolverHasConverged      = true;
+        m_InitialGuessBreakdownP = mBreakdownP;
         std::vector<double> eBrPVector(N);
         std::vector<double> hBrPVector(N);
         std::vector<double> BrPVector(N);

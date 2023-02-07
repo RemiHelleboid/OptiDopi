@@ -15,6 +15,7 @@
 
 #include "gradient.hpp"
 #include "interpolation.hpp"
+#include "smoother.hpp"
 
 void device::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
 
@@ -28,6 +29,11 @@ void device::setup_pin_diode(double      xlenght,
     m_doping_profile
         .set_up_pin_diode(0.0, xlenght, number_points, length_donor, length_intrinsic, donor_level, acceptor_level, intrisic_level);
 }
+
+void device::smooth_doping_profile(int window_size) {
+    m_doping_profile.smooth_doping_profile(window_size);
+}
+
 
 void device::solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations) {
     m_poisson_solver.set_doping_profile(m_doping_profile);
@@ -63,7 +69,7 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     m_mcintyre_solver.set_xline(x_line_cm);
     double tol = 1e-9;
     double breakdown_voltage = 0.0;
-    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step) {
+    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step_int) {
         // std::cout << "Solving McIntyre for voltage = " << m_list_voltages[idx_voltage] << std::endl;
         m_mcintyre_solver.set_electric_field(m_list_poisson_solutions[idx_voltage].m_electric_field);
         m_mcintyre_solver.ComputeDampedNewtonSolution(tol);
