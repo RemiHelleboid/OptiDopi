@@ -57,7 +57,7 @@ void device::export_poisson_solution(const std::string& directory_name, const st
 void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     double index_step = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
     int   index_step_int = int(index_step);
-    std::cout << "index_step = " << index_step << std::endl;
+    // std::cout << "index_step = " << index_step << std::endl;
     if (index_step == 0) {
         index_step = 1;
     }

@@ -62,6 +62,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
     m_electric_field = electric_field;
+    // m_electric_field = Utils::convol_square(electric_field, 11);
 
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);
@@ -73,6 +74,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         std::reduce(mBreakdownP.data(), mBreakdownP.data() + mBreakdownP.size(), 0.0) <= 1e-3) {
         // std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
+
     }
 }
 
@@ -182,12 +184,22 @@ Eigen::VectorXd McIntyre::assembleSecondMemberNewton() {
  *
  *  \return std::vector<double> Y the initial guess. */
 void McIntyre::initial_guess(double factor) {
-    int    NbPoints                      = m_xline.size();
-    auto   index_max_electric_field      = std::max_element(m_electric_field.begin(), m_electric_field.end());
-    double length_peack_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
+    int                 NbPoints                      = m_xline.size();
+    auto                index_max_electric_field      = std::max_element(m_electric_field.begin(), m_electric_field.end());
+    double              length_peack_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
+    std::vector<double> eInitialBrP(NbPoints);
+    std::vector<double> hInitialBrP(NbPoints);
     for (int i = 0; i < NbPoints; i++) {
-        m_InitialGuessBreakdownP[2 * i]     = factor * 0.8 * (m_xline[i] >= length_peack_triggering_force);
-        m_InitialGuessBreakdownP[2 * i + 1] = factor * 0.4 * (m_xline[i] < length_peack_triggering_force);
+        eInitialBrP[i] = factor * 0.8 * (m_xline[i] >= length_peack_triggering_force);
+        hInitialBrP[i] = factor * 0.4 * (m_xline[i] < length_peack_triggering_force);
+    }
+    // Smooth the initial guess
+    eInitialBrP = Utils::convol_square(eInitialBrP, 5);
+    hInitialBrP = Utils::convol_square(hInitialBrP, 5);
+    m_InitialGuessBreakdownP.resize(2 * NbPoints);
+    for (int i = 0; i < NbPoints; i++) {
+        m_InitialGuessBreakdownP[2 * i]     = eInitialBrP[i];
+        m_InitialGuessBreakdownP[2 * i + 1] = hInitialBrP[i];
     }
 }
 
@@ -206,19 +218,20 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
     Eigen::SparseLU<Eigen::SparseMatrix<double> > EigenSolver;
     EigenSolver.analyzePattern(MAT);
-    int    MaxEpoch = 250;
+    int    MaxEpoch = 500;
     double factor   = 1.0;
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         MAT = assembleMat();
         B   = assembleSecondMemberNewton();
         EigenSolver.factorize(MAT);
-        std::cout << "Epoch : " << epoch << std::endl;
+        // std::cout << "Epoch : " << epoch << std::endl;
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
-            double random       = (double)rand() / RAND_MAX;
-            factor              = random;
+            // double random       = factor
+            factor = factor * 0.99;
             initial_guess(factor);
-            std::cout << "Inter error\n";
+            mBreakdownP = m_InitialGuessBreakdownP;
+            // std::cerr << "Inter error\n";
             // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
             epoch++;
         } else {
@@ -232,7 +245,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
-        std::cout << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
+        std::cerr << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
         mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
         m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
         m_hBreakdownProbability                       = std::vector<double>(N, 0.0);
