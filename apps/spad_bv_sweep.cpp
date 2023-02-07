@@ -3,6 +3,10 @@
  */
 
 #include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
+#include <fmt/xchar.h>
 
 #include "PoissonSolver.hpp"
 #include "device.hpp"
@@ -11,25 +15,28 @@
 
 int main(int argc, char** argv) {
     fmt::print("Start of the program {}.\n", argv[0]);
-    double      total_length  = 10.0;
-    std::size_t number_points = 350;
-    double      length_donor  = 0.5;
-    double      doping_donor  = atof(argv[1]);
-    // double length_intrinsic = atof(argv[2]);
-    double doping_intrinsic = 1.0e13;
+    double      total_length     = 10.0;
+    std::size_t number_points    = 350;
+    double      length_donor     = 0.5;
+    double      doping_donor     = atof(argv[1]);
+    double      doping_intrinsic = 1.0e13;
 
     double min_acceptor           = 5.0e16;
     double max_acceptor           = 1.0e19;
-    int    number_acceptor_points = 5;
+    int    number_acceptor_points = 15;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
-    int    nb_length_intrinsic    = 6;
+    int    nb_length_intrinsic    = 12;
     auto   list_length_intrisic   = utils::linspace(0.0, 1.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
+    std::vector<std::vector<double>> Breakdown_Probability_list(number_acceptor_points);
+    std::vector<std::vector<double>> Depletion_Width_list(number_acceptor_points);
 
-    #pragma omp parallel for schedule(dynamic) num_threads(16)
+#pragma omp parallel for schedule(dynamic) num_threads(16)
     for (int i = 0; i < number_acceptor_points; ++i) {
         BV_list[i].resize(nb_length_intrinsic);
+        Breakdown_Probability_list[i].resize(nb_length_intrinsic);
+        Depletion_Width_list[i].resize(nb_length_intrinsic);
         const double doping_acceptor = list_doping_acceptor[i];
         for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {
             const double length_intrinsic = list_length_intrisic[idx_length];
@@ -55,7 +62,6 @@ int main(int argc, char** argv) {
             my_device.solve_mcintyre(mcintyre_voltage_step, stop_above_bv);
             const double brp_threshold = 1e-3;
             double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
-            BV_list[i][idx_length]     = BV;
 
             double BiasAboveBV               = 3.0;
             double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
@@ -66,14 +72,23 @@ int main(int argc, char** argv) {
                        BV,
                        BrP_at_Biasing,
                        DepletionWidth_at_Biasing);
+            BV_list[i][idx_length]                    = BV;
+            Breakdown_Probability_list[i][idx_length] = BrP_at_Biasing;
+            Depletion_Width_list[i][idx_length]       = DepletionWidth_at_Biasing;
         }
     }
     // Export BV list
     std::ofstream BV_file("BV_list.csv");
-    BV_file << "Acceptor,L_intrinsic,BV" << std::endl;
+    BV_file << "Acceptor,L_intrinsic,BV,BrP,Depletion" << std::endl;
     for (int i = 0; i < number_acceptor_points; ++i) {
         for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {
-            BV_file << list_doping_acceptor[i] << "," << list_length_intrisic[idx_length] << "," << BV_list[i][idx_length] << std::endl;
+            fmt::print(BV_file,
+                       "{:3e},{:3e},{:3e},{:3e},{:3e}\n",
+                       list_doping_acceptor[i],
+                       list_length_intrisic[idx_length],
+                       BV_list[i][idx_length],
+                       Breakdown_Probability_list[i][idx_length],
+                       Depletion_Width_list[i][idx_length]);
         }
     }
     BV_file.close();
