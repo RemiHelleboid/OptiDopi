@@ -23,18 +23,22 @@ int main(int argc, char** argv) {
 
     double min_acceptor           = 5.0e16;
     double max_acceptor           = 1.0e19;
-    int    number_acceptor_points = 16;
+    int    number_acceptor_points = 15;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
-    int    nb_length_intrinsic    = 16;
+    int    nb_length_intrinsic    = 12;
     auto   list_length_intrisic   = utils::linspace(0.0, 1.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
     std::vector<std::vector<double>> Breakdown_Probability_list(number_acceptor_points);
     std::vector<std::vector<double>> Depletion_Width_list(number_acceptor_points);
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) num_threads(16)
     for (int i = 0; i < number_acceptor_points; ++i) {
+        BV_list[i].resize(nb_length_intrinsic);
         Breakdown_Probability_list[i].resize(nb_length_intrinsic);
+        Depletion_Width_list[i].resize(nb_length_intrinsic);
+        const double doping_acceptor = list_doping_acceptor[i];
+        for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {
             const double length_intrinsic = list_length_intrisic[idx_length];
             device       my_device;
             my_device.setup_pin_diode(total_length,
