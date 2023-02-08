@@ -61,8 +61,8 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
-    m_electric_field = electric_field;
-    // m_electric_field = Utils::convol_square(electric_field, 11);
+    // m_electric_field = electric_field;
+    m_electric_field = Utils::convol_square(electric_field, 5);
 
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);

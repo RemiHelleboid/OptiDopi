@@ -23,16 +23,16 @@ int main(int argc, char** argv) {
 
     double min_acceptor           = 5.0e16;
     double max_acceptor           = 1.0e19;
-    int    number_acceptor_points = 15;
+    int    number_acceptor_points = 150;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
-    int    nb_length_intrinsic    = 12;
+    int    nb_length_intrinsic    = 150;
     auto   list_length_intrisic   = utils::linspace(0.0, 1.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
     std::vector<std::vector<double>> Breakdown_Probability_list(number_acceptor_points);
     std::vector<std::vector<double>> Depletion_Width_list(number_acceptor_points);
 
-#pragma omp parallel for schedule(dynamic) num_threads(16)
+#pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < number_acceptor_points; ++i) {
         BV_list[i].resize(nb_length_intrinsic);
         Breakdown_Probability_list[i].resize(nb_length_intrinsic);
@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
                                       doping_intrinsic);
             my_device.smooth_doping_profile(10);
             my_device.export_doping_profile("doping_profile.csv");
-            double    target_anode_voltage = 100.0;
+            double    target_anode_voltage = 50.0;
             double    tol                  = 1.0e-6;
             const int max_iter             = 100;
             double    voltage_step         = 0.01;
@@ -66,7 +66,9 @@ int main(int argc, char** argv) {
             double BiasAboveBV               = 3.0;
             double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
             double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV);
-            fmt::print("Acceptor : {:3e} \t Intrinsic : {:3e} \t BV : {:3e} \t BrP : {:3e} \t Depletion : {:3e} \n",
+            fmt::print("({}/{}) \t Acceptor : {:3e} \t Intrinsic : {:3e} \t BV : {:3e} \t BrP : {:3e} \t Depletion : {:3e} \n",
+                       i * number_acceptor_points + idx_length,
+                       number_acceptor_points * nb_length_intrinsic,
                        doping_acceptor,
                        length_intrinsic,
                        BV,
