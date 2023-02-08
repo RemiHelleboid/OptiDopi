@@ -20,14 +20,14 @@ int main(int argc, char** argv) {
 
     double min_acceptor           = 5.0e16;
     double max_acceptor           = 1.0e19;
-    int    number_acceptor_points = 5;
+    int    number_acceptor_points = 16;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
-    int    nb_length_intrinsic    = 6;
+    int    nb_length_intrinsic    = 16;
     auto   list_length_intrisic   = utils::linspace(0.0, 1.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
 
-    #pragma omp parallel for schedule(dynamic) num_threads(16)
+#pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < number_acceptor_points; ++i) {
         BV_list[i].resize(nb_length_intrinsic);
         const double doping_acceptor = list_doping_acceptor[i];

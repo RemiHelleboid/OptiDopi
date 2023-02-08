@@ -70,11 +70,10 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         m_eRateImpactIonization[idx_x] = alpha_DeMan(m_electric_field[idx_x], Gamma, E_g);
         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
     }
-    if (recompute_initial_guess || !mSolverHasConverged ||
-        std::reduce(mBreakdownP.data(), mBreakdownP.data() + mBreakdownP.size(), 0.0) <= 1e-3) {
+    double total_brp = mBreakdownP.norm();
+    if (recompute_initial_guess || !mSolverHasConverged || total_brp <= 1e-3) {
         // std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
-
     }
 }
 

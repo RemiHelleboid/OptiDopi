@@ -64,7 +64,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   enable_cxx_compiler_flag_if_supported("-Wno-deprecated-copy")
   enable_cxx_compiler_flag_if_supported("-fsanitize=address")
 
+  
+
 endif()
+
+message("Optimization for the local machine is enabled")
+add_compile_options(-march=native)
+
 
 find_package(Eigen3 NO_MODULE)
 
@@ -84,7 +90,7 @@ find_package(OpenMP REQUIRED)
 # Fetch fmt library
 FetchContent_Declare(
   fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt/
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
   GIT_TAG 9.1.0)
 
 find_package(fmt CONFIG QUIET)
