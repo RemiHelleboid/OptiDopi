@@ -18,16 +18,16 @@ int main(int argc, char** argv) {
     // double length_intrinsic = atof(argv[2]);
     double doping_intrinsic = 1.0e10;
 
-    double min_acceptor           = 1.0e15;
+    double min_acceptor           = 1.0e16;
     double max_acceptor           = 1.0e19;
     int    number_acceptor_points = 3;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
     int    nb_length_intrinsic    = 3;
-    auto   list_length_intrisic   = utils::linspace(0.0, 5.0, nb_length_intrinsic);
+    auto   list_length_intrisic   = utils::linspace(0.0, 2.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
 
-// #pragma omp parallel for schedule(dynamic) num_threads(16)
+    // #pragma omp parallel for schedule(dynamic) num_threads(16)
     for (int i = 0; i < number_acceptor_points; ++i) {
         BV_list[i].resize(nb_length_intrinsic);
         const double doping_acceptor = list_doping_acceptor[i];
@@ -42,8 +42,9 @@ int main(int argc, char** argv) {
                                       doping_donor,
                                       doping_acceptor,
                                       doping_intrinsic);
+            my_device.smooth_doping_profile(10);
             my_device.export_doping_profile("doping_profile.csv");
-            double    target_anode_voltage = 400.0;
+            double    target_anode_voltage = 100.0;
             double    tol                  = 1.0e-6;
             const int max_iter             = 100;
             double    voltage_step         = 0.01;
@@ -55,8 +56,17 @@ int main(int argc, char** argv) {
             my_device.solve_mcintyre(mcintyre_voltage_step, stop_above_bv);
             const double brp_threshold = 1e-3;
             double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
-            fmt::print("Acceptor : {:3e} Breakdown voltage: {} V \n", doping_acceptor, BV);
-            BV_list[i][idx_length] = BV;
+            BV_list[i][idx_length]     = BV;
+
+            double BiasAboveBV               = 3.0;
+            double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
+            double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV);
+            fmt::print("Acceptor : {:3e} \t Intrinsic : {:3e} \t BV : {:3e} \t BrP : {:3e} \t Depletion : {:3e} \n",
+                       doping_acceptor,
+                       length_intrinsic,
+                       BV,
+                       BrP_at_Biasing,
+                       DepletionWidth_at_Biasing);
         }
     }
     // Export BV list

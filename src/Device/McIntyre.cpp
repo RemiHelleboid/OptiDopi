@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <random>
 
 #include "ImpactIonization.hpp"
 #include "smoother.hpp"
@@ -60,7 +61,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
-    m_electric_field   = electric_field;
+    m_electric_field = electric_field;
 
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);
@@ -211,10 +212,13 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         MAT = assembleMat();
         B   = assembleSecondMemberNewton();
         EigenSolver.factorize(MAT);
+        std::cout << "Epoch : " << epoch << std::endl;
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
-            factor *= 0.5;
+            double random       = (double)rand() / RAND_MAX;
+            factor              = random;
             initial_guess(factor);
+            std::cout << "Inter error\n";
             // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
             epoch++;
         } else {
