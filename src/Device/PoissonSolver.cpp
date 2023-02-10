@@ -317,7 +317,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
         constexpr double    cm_to_m               = 1.0e-2;
         std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value *= cm_to_m; });
         // Take absolute value of electric field
-        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::abs(value); });
+        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::fabs(value); });
         PoissonSolution solution(anode_voltage, m_x_line, m_solution, m_electron_density, m_hole_density, electric_field_vector);
         m_list_voltages.push_back(anode_voltage);
         m_list_poisson_solutions.push_back(solution);

@@ -47,6 +47,7 @@ class device {
                          double      donor_level,
                          double      acceptor_level,
                          double      intrisic_level);
+    
 
     void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
     void smooth_doping_profile(int window_size);
@@ -65,5 +66,5 @@ class device {
     double              extract_breakdown_voltage(double brp_threshold) const;
 
     double get_brp_at_voltage(double voltage) const;
-    double get_depletion_at_voltage(double voltage)const ;
+    double get_depletion_at_voltage(double voltage) const;
 };

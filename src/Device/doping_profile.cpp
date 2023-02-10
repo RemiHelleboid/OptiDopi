@@ -9,17 +9,16 @@
  *
  */
 
+#include "doping_profile.hpp"
+
+#include <algorithm>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <vector>
-#include <algorithm>
-#include <fstream>
 
-
-#include "doping_profile.hpp"
 #include "fill_vector.hpp"
-
 #include "smoother.hpp"
 
 doping_profile::doping_profile(double x_min, double x_max, std::size_t number_points)
@@ -38,7 +37,7 @@ void doping_profile::re_compute_total_doping() {
         throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
     }
     m_doping_concentration.resize(m_acceptor_concentration.size());
-     for (std::size_t index_value = 0; index_value < m_acceptor_concentration.size(); index_value++) {
+    for (std::size_t index_value = 0; index_value < m_acceptor_concentration.size(); index_value++) {
         m_doping_concentration[index_value] = -m_donor_concentration[index_value] + m_acceptor_concentration[index_value];
     }
 }
@@ -71,6 +70,22 @@ void doping_profile::set_up_pin_diode(double      x_min,
         }
     }
     re_compute_total_doping();
+}
+
+void doping_profile::set_up_advanced_spad(double              total_length,
+                                          std::size_t         nb_points,
+                                          double              length_donor,
+                                          double              length_intrinsic,
+                                          double              donor_level,
+                                          double              intrinsic_level,
+                                          std::vector<double> acceptor_positions,
+                                          std::vector<double> acceptor_concentrations) {
+    m_x_line = utils::linspace(0.0, total_length, nb_points);
+    m_donor_concentration.clear();
+    m_acceptor_concentration.clear();
+    m_donor_concentration.resize(nb_points);
+    m_acceptor_concentration.resize(nb_points);
+    
 }
 
 void doping_profile::export_doping_profile(const std::string& filename) const {

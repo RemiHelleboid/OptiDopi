@@ -47,5 +47,14 @@ class doping_profile {
                           double      acceptor_level,
                           double      intrisic_level);
 
+    void set_up_advanced_spad(double              total_length,
+                              std::size_t         nb_points,
+                              double              length_donor,
+                              double              length_intrinsic,
+                              double              donor_level,
+                              double              intrinsic_level,
+                              std::vector<double> acceptor_segment_length,
+                              std::vector<double> acceptor_concentrations);
+
     void export_doping_profile(const std::string& filename) const;
 };
