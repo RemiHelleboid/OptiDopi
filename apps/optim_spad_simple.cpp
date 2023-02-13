@@ -15,10 +15,9 @@
 
 // Set number of threads
 
-
 double cost_function_formal(double BreakdownVoltage, double BreakdownProbability, double DepletionWidth) {
     double       BV_Target = 20.0;
-    const double alpha_BV  = 100.0;
+    const double alpha_BV  = 1000.0;
     const double alpha_BP  = 100.0;
     const double alpha_DW  = 10.0;
     double       BV_cost   = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
@@ -29,14 +28,14 @@ double cost_function_formal(double BreakdownVoltage, double BreakdownProbability
     } else {
         BV_cost *= -1.0;
     }
-    std::cout << "BV: " << BreakdownVoltage << " ----> BV cost: " << BV_cost << std::endl;
+    // std::cout << "BV: " << BreakdownVoltage << " ----> BV cost: " << BV_cost << std::endl;
     // std::cout << "BP cost: " << BP_cost << std::endl;
     // std::cout << "DW cost: " << DW_cost << std::endl;
-    double cost = DW_cost + BV_cost;
+    double cost = DW_cost + BV_cost + BP_cost;
     return -cost;
 }
 
-double intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id=0) {
+double intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
     std::size_t number_points    = 500;
     double      total_length     = 10.0;
     double      length_donor     = 0.5;
@@ -65,15 +64,15 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_acc
     double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
     double       BiasAboveBV   = 3.0;
     if (std::isnan(BV) || (BV + 1.5 * BiasAboveBV) > target_anode_voltage) {
+        fmt::print("NaN BV\n");
         return 1.1e10;
     }
 
-    // double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
-
+    // double BrP_at_Biasing            = 1.0e-3;
     // double BV                        = 20.0;
-    double BrP_at_Biasing            = 1.0e-3;
     double meter_to_micron           = 1.0e6;
     double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV) * meter_to_micron;
+    double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
     fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
     double cost = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
@@ -88,16 +87,20 @@ double cost_function(std::vector<double> variables) {
     return cost;
 }
 
-
-
 void create_map_cost_function(std::string filename) {
-    std::vector<double> length_intrinsic = utils::linspace(0.0, 4.0, 50);
-    std::vector<double> doping_acceptor  = utils::linspace(16.0, 19.0, 50);
+    std::vector<double>              length_intrinsic = utils::linspace(0.0, 4.0, 100);
+    std::vector<double>              doping_acceptor  = utils::linspace(15.0, 19.0, 100);
     std::vector<std::vector<double>> cost_function(length_intrinsic.size(), std::vector<double>(doping_acceptor.size(), 0.0));
-#pragma omp parallel for num_threads(16)
+    std::cout << "Start computation\n";
+    int total_done = 0;
+#pragma omp parallel for reduction(+ : total_done)
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
             cost_function[i][j] = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
+        }
+        total_done++;
+        if (omp_get_thread_num() == 0) {
+            std::cout << "Done : " << total_done << " / " << length_intrinsic.size() << std::endl;
         }
     }
     // Write to file with fmt
@@ -111,9 +114,7 @@ void create_map_cost_function(std::string filename) {
     file.close();
 }
 
-
 int main() {
-    omp_set_num_threads(16);
     std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
 
     std::string DIR_RES = "results";
