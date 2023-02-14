@@ -84,7 +84,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     }
     double total_brp = mBreakdownP.norm();
     if (!mSolverHasConverged || total_brp <= 0.5) {
-        std::cout << "Recomputing initial guess" << std::endl;
+        // std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
     }
 }
@@ -248,7 +248,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
             initial_guess(1.0 + random_e, 1.0 + 0.99 * random_e);
             mBreakdownP = m_InitialGuessBreakdownP;
             // std::cerr << "Inter error\n";
-            std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
+            // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
             // lambda *= 0.5;
             epoch++;
         } else {
@@ -262,7 +262,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
-        std::cerr << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
+        std::cerr << "FINAL NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
         mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
         m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
         m_hBreakdownProbability                       = std::vector<double>(N, 0.0);

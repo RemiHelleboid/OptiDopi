@@ -67,7 +67,7 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     double breakdown_voltage = 0.0;
     double cm_to_micron    = 1.0e-4;
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step_int) {
-        std::cout << "Voltage = " << m_list_voltages[idx_voltage] << std::endl;
+        // std::cout << "Voltage = " << m_list_voltages[idx_voltage] << std::endl;
         m_mcintyre_solver.set_electric_field(m_list_poisson_solutions[idx_voltage].m_electric_field, true, cm_to_micron);
         m_mcintyre_solver.ComputeDampedNewtonSolution(tol);
         m_list_mcintyre_voltages.push_back(m_list_voltages[idx_voltage]);

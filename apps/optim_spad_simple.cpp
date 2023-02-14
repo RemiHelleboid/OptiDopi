@@ -202,8 +202,10 @@ int main() {
 
     double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
     double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
+    double ration_converged_mcintyre = mcintyre::McIntyre::get_ratio_converged_sim() * 100.0;
     fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
     fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
+    fmt::print("Ratio of converged simulations: {:.2f}% \n", ration_converged_mcintyre);
     exit(0);
 
     // Create simulated annealing object
