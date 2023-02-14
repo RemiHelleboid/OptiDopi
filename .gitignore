@@ -39,6 +39,9 @@ data/*
 *.mesh
 *.tcl
 *.log
+*.pdf
+*.eps
+*.png
 
 # CMake
 CMakeLists.txt.user

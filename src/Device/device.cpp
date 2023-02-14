@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <iostream>
 
+#include "fill_vector.hpp"
 #include "gradient.hpp"
 #include "interpolation.hpp"
 #include "smoother.hpp"
@@ -30,10 +31,7 @@ void device::setup_pin_diode(double      xlenght,
         .set_up_pin_diode(0.0, xlenght, number_points, length_donor, length_intrinsic, donor_level, acceptor_level, intrisic_level);
 }
 
-void device::smooth_doping_profile(int window_size) {
-    m_doping_profile.smooth_doping_profile(window_size);
-}
-
+void device::smooth_doping_profile(int window_size) { m_doping_profile.smooth_doping_profile(window_size); }
 
 void device::solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations) {
     m_poisson_solver.set_doping_profile(m_doping_profile);
@@ -55,8 +53,8 @@ void device::export_poisson_solution(const std::string& directory_name, const st
 }
 
 void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
-    double index_step = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
-    int   index_step_int = int(index_step);
+    double index_step     = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
+    int    index_step_int = int(index_step);
     // std::cout << "index_step = " << index_step << std::endl;
     if (index_step == 0) {
         index_step = 1;
@@ -67,7 +65,7 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
         x *= micron_to_cm;
     }
     m_mcintyre_solver.set_xline(x_line_cm);
-    double tol = 1e-9;
+    double tol               = 1e-9;
     double breakdown_voltage = 0.0;
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step_int) {
         // std::cout << "Solving McIntyre for voltage = " << m_list_voltages[idx_voltage] << std::endl;
@@ -85,7 +83,7 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
 }
 
 void device::export_depletion_width(const std::string& directory_name, const std::string& prefix) const {
-    const double epsilon = 1e-9;
+    const double        epsilon                          = 1e-9;
     std::vector<double> list_total_breakdown_probability = m_poisson_solver.get_list_depletion_width(epsilon);
     std::filesystem::create_directories(directory_name);
     std::ofstream file;
@@ -98,7 +96,6 @@ void device::export_depletion_width(const std::string& directory_name, const std
     file.close();
 }
 
-
 std::vector<double> device::get_list_total_breakdown_probability() const {
     std::vector<double> list_total_breakdown_probability;
     for (const auto& mcintyre_solution : m_list_mcintyre_solutions) {
@@ -109,13 +106,13 @@ std::vector<double> device::get_list_total_breakdown_probability() const {
 
 double device::extract_breakdown_voltage(double brp_threshold) const {
     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
-    auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double& voltage) {
-        return voltage > brp_threshold;
-    });
-    if (it_bv == list_total_breakdown_probability.end()) {
-        return std::numeric_limits<double>::quiet_NaN();
+    // Find the first voltage where the total breakdown probability is above the threshold
+    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
+        if (list_total_breakdown_probability[idx_voltage] > brp_threshold) {
+            return m_list_voltages[idx_voltage];
+        }
     }
-    return m_list_mcintyre_voltages[std::distance(list_total_breakdown_probability.begin(), it_bv)];
+    return std::numeric_limits<double>::quiet_NaN();
 }
 
 void device::export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const {
@@ -149,8 +146,7 @@ double device::get_brp_at_voltage(double voltage) const {
 }
 
 double device::get_depletion_at_voltage(double voltage) const {
-    double epsilon = 1e-8;
+    double epsilon                = 1e-8;
     double interpolated_depletion = Utils::interp1d(m_list_voltages, m_poisson_solver.get_list_depletion_width(epsilon), voltage);
     return interpolated_depletion;
 }
-

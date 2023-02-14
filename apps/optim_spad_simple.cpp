@@ -102,9 +102,9 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
         // fmt::print("NaN BV\n");
         cost_function_result cost_resultr_NaN;
         cost_resultr_NaN.BV_cost    = -1.0e10;
-        cost_resultr_NaN.BP_cost    = -1.0e10;
-        cost_resultr_NaN.DW_cost    = -1.0e10;
-        cost_resultr_NaN.total_cost = -1.0e10;
+        cost_resultr_NaN.BP_cost    = +1.0e10;
+        cost_resultr_NaN.DW_cost    = +1.0e10;
+        cost_resultr_NaN.total_cost = +1.0e10;
         return {length_intrinsic, doping_acceptor, BV, NAN_DOUBLE, NAN_DOUBLE, cost_resultr_NaN};
     }
 
@@ -120,8 +120,8 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 }
 
 void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 50;
-    int                 Nlen             = 50;
+    int                 Ndop             = 20;
+    int                 Nlen             = 20;
     double              min_doping       = 16;
     double              max_doping       = 19;
     double              min_length       = 0.0;
@@ -139,7 +139,7 @@ void create_map_cost_function(std::string filename) {
 
     std::cout << "Start computation over " << length_intrinsic.size() * doping_acceptor.size() << " points." << std::endl;
     int total_done = 0;
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic) num_threads(1)
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
             result_sim res = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);

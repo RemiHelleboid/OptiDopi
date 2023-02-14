@@ -14,3 +14,7 @@ target_link_libraries(test_optim fmt::fmt OpenMP::OpenMP_CXX)
 add_executable(optim_spad_simple optim_spad_simple.cpp)
 target_link_libraries(optim_spad_simple libdevice libutils liboptim)
 target_link_libraries(optim_spad_simple fmt::fmt OpenMP::OpenMP_CXX)
+
+add_executable(test_interp test_interp.cpp)
+target_link_libraries(test_interp libdevice libutils liboptim)
+target_link_libraries(test_interp fmt::fmt OpenMP::OpenMP_CXX)
