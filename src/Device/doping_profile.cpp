@@ -29,7 +29,9 @@ doping_profile::doping_profile(double x_min, double x_max, std::size_t number_po
 }
 
 void doping_profile::smooth_doping_profile(int window_size) {
-    m_doping_concentration == Utils::convol_square(m_doping_concentration, window_size);
+    m_donor_concentration    = Utils::convol_square(m_donor_concentration, window_size);
+    m_acceptor_concentration = Utils::convol_square(m_acceptor_concentration, window_size);
+    re_compute_total_doping();
 }
 
 void doping_profile::re_compute_total_doping() {

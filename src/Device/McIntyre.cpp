@@ -57,6 +57,11 @@ void McIntyre::set_xline(std::vector<double> x_line) {
     m_hRateImpactIonization.resize(m_xline.size());
 }
 
+void McIntyre::set_xline(const Eigen::VectorXd& x_line) {
+    m_xline                  = std::vector<double>(x_line.data(), x_line.data() + x_line.size());
+    this->set_xline(m_xline);
+}
+
 void McIntyre::set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess) {
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");

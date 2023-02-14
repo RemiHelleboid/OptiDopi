@@ -12,6 +12,7 @@
 
 #include "Physics.hpp"
 #include "doping_profile.hpp"
+#include "McIntyre.hpp"
 
 typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> SolverSparseLU;
 
@@ -59,6 +60,8 @@ class NewtonPoissonSolver {
     Eigen::VectorXd              m_derivative_total_charge;
     std::vector<double>          m_list_voltages;
     std::vector<PoissonSolution> m_list_poisson_solutions;
+
+    mcintyre::McIntyre           m_mcintyre_solver;
 
     static double m_poisson_solver_time;
 

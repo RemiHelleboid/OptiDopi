@@ -21,7 +21,9 @@ std::vector<T> convol_square(const std::vector<T>& y, int window_size) {
                 ++actual_window_size;
             }
         }
-        convol[index] = sum / static_cast<T>(actual_window_size);
+        // std::cout << "actual_window_size = " << actual_window_size << std::endl;
+        convol[index] = sum / static_cast<double>(actual_window_size);
+        // std::cout << "Initial value = " << y[index] << ", convoluted value = " << convol[index] << std::endl;
     }
     return convol;
 }

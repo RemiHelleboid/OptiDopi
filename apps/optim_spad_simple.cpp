@@ -81,9 +81,9 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 
     device my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
-    my_device.smooth_doping_profile(10);
+    my_device.smooth_doping_profile(20);
     std::string filename = fmt::format("results/doping_profile_{:.5e}_{:.5e}.csv", length_intrinsic, doping_acceptor);
-    // my_device.export_doping_profile(filename);
+    my_device.export_doping_profile(filename);
 
     double    target_anode_voltage = 40.0;
     double    tol                  = 1.0e-6;
@@ -93,7 +93,7 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
 
     const double stop_above_bv         = 5.0;
-    double       mcintyre_voltage_step = 0.5;
+    double       mcintyre_voltage_step = 0.25;
     my_device.solve_mcintyre(mcintyre_voltage_step, stop_above_bv);
     const double brp_threshold = 1e-3;
     double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
@@ -120,8 +120,8 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 }
 
 void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 20;
-    int                 Nlen             = 20;
+    int                 Ndop             = 8;
+    int                 Nlen             = 8;
     double              min_doping       = 16;
     double              max_doping       = 19;
     double              min_length       = 0.0;
@@ -139,7 +139,7 @@ void create_map_cost_function(std::string filename) {
 
     std::cout << "Start computation over " << length_intrinsic.size() * doping_acceptor.size() << " points." << std::endl;
     int total_done = 0;
-#pragma omp parallel for schedule(dynamic) 
+#pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
             // std::cout << "Intrinsic length: " << length_intrinsic[i] << ", doping: " << doping_acceptor[j] << std::endl;
@@ -197,6 +197,10 @@ int main() {
     }
     create_map_cost_function("main_cost_function.csv");
 
+    double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
+    double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
+    fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
+    fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
     exit(0);
 
     // Create simulated annealing object
@@ -260,8 +264,4 @@ int main() {
     std::cout << "Doping: " << log_doping_acceptor << std::endl;
     intermediate_cost_function(length_intrinsic, log_doping_acceptor);
 
-    double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
-    double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
-    fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
-    fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
 }

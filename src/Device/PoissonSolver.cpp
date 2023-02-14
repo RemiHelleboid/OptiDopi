@@ -23,7 +23,7 @@
 #include "doping_profile.hpp"
 #include "gradient.hpp"
 #include "smoother.hpp"
-
+#include "McIntyre.hpp"
 
 double NewtonPoissonSolver::m_poisson_solver_time = 0.0;
 
@@ -111,6 +111,8 @@ NewtonPoissonSolver::NewtonPoissonSolver(const Eigen::VectorXd& doping_concentra
     m_hole_density.resize(m_x_line.size());
     m_total_charge.resize(m_x_line.size());
     m_derivative_total_charge.resize(m_x_line.size());
+    
+    m_mcintyre_solver.set_xline(m_x_line);
 }
 
 NewtonPoissonSolver::NewtonPoissonSolver(const doping_profile& my_doping_profile) {

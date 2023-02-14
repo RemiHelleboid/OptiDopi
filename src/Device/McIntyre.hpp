@@ -15,11 +15,11 @@
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <chrono>
 #include <cmath>
 #include <exception>
 #include <fstream>
 #include <iostream>
-#include <chrono>
 #include <vector>
 
 #include "ImpactIonization.hpp"
@@ -73,7 +73,9 @@ class McIntyre {
     static double get_mcintyre_time() { return m_McIntyre_time; }
 
     void set_xline(std::vector<double> x_line);
-    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess=true);
+    void set_xline(const Eigen::VectorXd& x_line);
+
+    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess = true);
 
     double                      dPe_func(double Pe, double Ph, int index);
     double                      dPh_func(double Pe, double Ph, int index);
