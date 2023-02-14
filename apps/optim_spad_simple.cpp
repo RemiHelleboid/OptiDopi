@@ -85,7 +85,7 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     std::string filename = fmt::format("results/doping_profile_{:.5e}_{:.5e}.csv", length_intrinsic, doping_acceptor);
     // my_device.export_doping_profile(filename);
 
-    double    target_anode_voltage = 50.0;
+    double    target_anode_voltage = 40.0;
     double    tol                  = 1.0e-6;
     const int max_iter             = 100;
     double    voltage_step         = 0.01;
@@ -93,7 +93,7 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
 
     const double stop_above_bv         = 5.0;
-    double       mcintyre_voltage_step = 0.25;
+    double       mcintyre_voltage_step = 0.5;
     my_device.solve_mcintyre(mcintyre_voltage_step, stop_above_bv);
     const double brp_threshold = 1e-3;
     double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
@@ -139,9 +139,10 @@ void create_map_cost_function(std::string filename) {
 
     std::cout << "Start computation over " << length_intrinsic.size() * doping_acceptor.size() << " points." << std::endl;
     int total_done = 0;
-#pragma omp parallel for schedule(dynamic) num_threads(1)
+#pragma omp parallel for schedule(dynamic) 
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
+            // std::cout << "Intrinsic length: " << length_intrinsic[i] << ", doping: " << doping_acceptor[j] << std::endl;
             result_sim res = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
             BV[i][j]       = res.BV;
             BP[i][j]       = res.BrP;
@@ -258,4 +259,9 @@ int main() {
     std::cout << "Length: " << length_intrinsic << std::endl;
     std::cout << "Doping: " << log_doping_acceptor << std::endl;
     intermediate_cost_function(length_intrinsic, log_doping_acceptor);
+
+    double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
+    double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
+    fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
+    fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
 }

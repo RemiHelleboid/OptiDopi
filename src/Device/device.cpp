@@ -104,15 +104,50 @@ std::vector<double> device::get_list_total_breakdown_probability() const {
     return list_total_breakdown_probability;
 }
 
+// double device::extract_breakdown_voltage(double brp_threshold) const {
+//     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
+//     auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double&
+//     voltage) {
+//         return voltage > brp_threshold;
+//     });
+//     if (it_bv == list_total_breakdown_probability.end()) {
+//         std::cout << "NaN BV" << std::endl;
+//         return std::numeric_limits<double>::quiet_NaN();
+//     }
+//     return m_list_mcintyre_voltages[std::distance(list_total_breakdown_probability.begin(), it_bv)];
+// }
+
+// double device::extract_breakdown_voltage(double brp_threshold) const {
+//     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
+//     for (std::size_t idx_voltage = 0; idx_voltage < list_total_breakdown_probability.size(); ++idx_voltage) {
+//         if (list_total_breakdown_probability[idx_voltage] > brp_threshold) {
+//             return m_list_mcintyre_voltages[idx_voltage];
+//         }
+//     }
+//     std::cout << "NaN BV" << std::endl;
+//     return std::numeric_limits<double>::quiet_NaN();
+// }
+
 double device::extract_breakdown_voltage(double brp_threshold) const {
     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
-    // Find the first voltage where the total breakdown probability is above the threshold
-    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
-        if (list_total_breakdown_probability[idx_voltage] > brp_threshold) {
-            return m_list_voltages[idx_voltage];
-        }
+    auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double& voltage) {
+        return voltage > brp_threshold;
+    });
+    if (it_bv == list_total_breakdown_probability.end()) {
+        // std::cout << "NaN BV" << std::endl;
+        return std::numeric_limits<double>::quiet_NaN();
     }
-    return std::numeric_limits<double>::quiet_NaN();
+    // Interpolate the BV
+    std::size_t idx_voltage  = std::distance(list_total_breakdown_probability.begin(), it_bv);
+    double      voltage      = m_list_mcintyre_voltages[idx_voltage];
+    double      brp          = list_total_breakdown_probability[idx_voltage];
+    double      brp_prev     = list_total_breakdown_probability[idx_voltage - 1];
+    double      voltage_prev = m_list_mcintyre_voltages[idx_voltage - 1];
+    double m_slope = (brp - brp_prev) / (voltage - voltage_prev);
+    double m_intercept = brp - m_slope * voltage;
+    // std::cout << "Original BV: " << voltage << std::endl;
+    // std::cout << "Interpolated BV: " << (brp_threshold - m_intercept) / m_slope << std::endl << std::endl;  
+    return (brp_threshold - m_intercept) / m_slope;
 }
 
 void device::export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const {
