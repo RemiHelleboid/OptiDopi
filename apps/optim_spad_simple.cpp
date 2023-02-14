@@ -36,7 +36,7 @@ double cost_function_formal(double BreakdownVoltage, double BreakdownProbability
 }
 
 double intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
-    std::size_t number_points    = 500;
+    std::size_t number_points    = 400;
     double      total_length     = 10.0;
     double      length_donor     = 0.5;
     double      doping_donor     = 5.0e19;
@@ -48,7 +48,7 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_acc
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
     my_device.smooth_doping_profile(10);
     std::string filename = fmt::format("results/doping_profile_{:.5e}_{:.5e}.csv", length_intrinsic, doping_acceptor);
-    my_device.export_doping_profile(filename);
+    // my_device.export_doping_profile(filename);
 
     double    target_anode_voltage = 50.0;
     double    tol                  = 1.0e-6;
@@ -64,7 +64,7 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_acc
     double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
     double       BiasAboveBV   = 3.0;
     if (std::isnan(BV) || (BV + 1.5 * BiasAboveBV) > target_anode_voltage) {
-        fmt::print("NaN BV\n");
+        // fmt::print("NaN BV\n");
         return 1.1e10;
     }
 
@@ -73,7 +73,7 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_acc
     double meter_to_micron           = 1.0e6;
     double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV) * meter_to_micron;
     double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
-    fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
+    // fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
     double cost = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
     return cost;
@@ -83,24 +83,27 @@ double cost_function(std::vector<double> variables) {
     double length_intrinsic = variables[0];
     double doping_acceptor  = variables[1];
     double cost             = intermediate_cost_function(length_intrinsic, doping_acceptor);
-    fmt::print("Doping: {:.5e}, Length: {:.5e}, Cost: {:.5e}\n", pow(10, doping_acceptor), length_intrinsic, cost);
+    // fmt::print("Doping: {:.5e}, Length: {:.5e}, Cost: {:.5e}\n", pow(10, doping_acceptor), length_intrinsic, cost);
     return cost;
 }
 
 void create_map_cost_function(std::string filename) {
-    std::vector<double>              length_intrinsic = utils::linspace(0.0, 4.0, 100);
-    std::vector<double>              doping_acceptor  = utils::linspace(15.0, 19.0, 100);
+    double min_doping = 5.0e16;
+    double max_doping = 1.0e19;
+    double min_length = 0.0;
+    double max_length = 1.0;
+    std::vector<double>              length_intrinsic = utils::linspace(0.0, 1.0, 500);
+    std::vector<double>              doping_acceptor  = utils::linspace(16.0, 19.0, 500);
     std::vector<std::vector<double>> cost_function(length_intrinsic.size(), std::vector<double>(doping_acceptor.size(), 0.0));
-    std::cout << "Start computation\n";
+    std::cout << "Start computation over " << length_intrinsic.size()* doping_acceptor .size() << std::endl;
     int total_done = 0;
-#pragma omp parallel for reduction(+ : total_done)
+#pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
             cost_function[i][j] = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
         }
-        total_done++;
         if (omp_get_thread_num() == 0) {
-            std::cout << "Done : " << total_done << " / " << length_intrinsic.size() << std::endl;
+            std::cout << "Done : " << i << " / " << length_intrinsic.size() << std::endl;
         }
     }
     // Write to file with fmt
