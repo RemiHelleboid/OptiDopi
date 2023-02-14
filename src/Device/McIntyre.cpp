@@ -15,9 +15,9 @@
 
 namespace mcintyre {
 
-double McIntyre::m_McIntyre_time = 0.0;
+double      McIntyre::m_McIntyre_time    = 0.0;
 std::size_t McIntyre::m_total_number_sim = 0;
-std::size_t McIntyre::m_converged_sim = 0;
+std::size_t McIntyre::m_converged_sim    = 0;
 
 McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperature(temperature), m_xline(x_line) {
     mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
@@ -83,8 +83,8 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
     }
     double total_brp = mBreakdownP.norm();
-    if (recompute_initial_guess || !mSolverHasConverged || total_brp <= 1e-3) {
-        // std::cout << "Recomputing initial guess" << std::endl;
+    if (!mSolverHasConverged || total_brp <= 0.5) {
+        std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
     }
 }
@@ -230,9 +230,12 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
     Eigen::SparseLU<Eigen::SparseMatrix<double> > EigenSolver;
     EigenSolver.analyzePattern(MAT);
-    int    MaxEpoch = 2500;
-    double factor   = 1.0;
-    double lambda   = 1.0;
+    int                              MaxEpoch = 2500;
+    double                           factor   = 1.0;
+    double                           lambda   = 1.0;
+    std::random_device               rd;
+    std::mt19937                     gen(rd());
+    std::uniform_real_distribution<> dis(-0.05, 0.05);
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         double lambda = 1.0;
         MAT           = assembleMat();
@@ -241,7 +244,8 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
             factor              = factor * 1.05;
-            initial_guess(0.95, 0.95);
+            double random_e     = dis(gen);
+            initial_guess(1.0 + random_e, 1.0 + 0.99 * random_e);
             mBreakdownP = m_InitialGuessBreakdownP;
             // std::cerr << "Inter error\n";
             std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
@@ -254,7 +258,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
             mBreakdownP = mBreakdownP + lambda * W;
             epoch++;
         }
-        std::cout << "epoch = " << epoch << " Norm_w = " << Norm_w << std::endl;
+        // std::cout << "epoch = " << epoch << " Norm_w = " << Norm_w << std::endl;
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
