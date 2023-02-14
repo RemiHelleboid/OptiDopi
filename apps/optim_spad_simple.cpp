@@ -5,6 +5,7 @@
 #include <fmt/xchar.h>
 
 #include <filesystem>
+#include <numeric>
 
 #include "PoissonSolver.hpp"
 #include "SimulatedAnneal.hpp"
@@ -15,7 +16,43 @@
 
 // Set number of threads
 
-double cost_function_formal(double BreakdownVoltage, double BreakdownProbability, double DepletionWidth) {
+#define NAN_DOUBLE std::numeric_limits<double>::quiet_NaN()
+
+struct cost_function_result {
+    double BV_cost;
+    double BP_cost;
+    double DW_cost;
+    double total_cost;
+};
+
+struct result_sim {
+    double               length_intrinsic;
+    double               doping_acceptor;
+    double               BV;
+    double               BrP;
+    double               DW;
+    cost_function_result cost_result;
+
+    result_sim(double length_intrinsic, double doping_acceptor, double BV, double BrP, double DW, cost_function_result cost) {
+        this->length_intrinsic = length_intrinsic;
+        this->doping_acceptor  = doping_acceptor;
+        this->BV               = BV;
+        this->BrP              = BrP;
+        this->DW               = DW;
+        this->cost_result      = cost;
+    }
+};
+
+struct mapping_cost_function {
+    std::vector<double>              length_intrinsic;
+    std::vector<double>              doping_acceptor;
+    std::vector<std::vector<double>> breakdown_voltage;
+    std::vector<std::vector<double>> breakdown_probability;
+    std::vector<std::vector<double>> depletion_width;
+    std::vector<std::vector<double>> cost_function;
+};
+
+cost_function_result cost_function_formal(double BreakdownVoltage, double BreakdownProbability, double DepletionWidth) {
     double       BV_Target = 20.0;
     const double alpha_BV  = 1000.0;
     const double alpha_BP  = 100.0;
@@ -28,14 +65,12 @@ double cost_function_formal(double BreakdownVoltage, double BreakdownProbability
     } else {
         BV_cost *= -1.0;
     }
-    // std::cout << "BV: " << BreakdownVoltage << " ----> BV cost: " << BV_cost << std::endl;
-    // std::cout << "BP cost: " << BP_cost << std::endl;
-    // std::cout << "DW cost: " << DW_cost << std::endl;
     double cost = DW_cost + BV_cost + BP_cost;
-    return -cost;
+    cost *= -1.0;
+    return {BV_cost, BP_cost, DW_cost, cost};
 }
 
-double intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
+result_sim intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
     std::size_t number_points    = 400;
     double      total_length     = 10.0;
     double      length_donor     = 0.5;
@@ -65,56 +100,88 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_acc
     double       BiasAboveBV   = 3.0;
     if (std::isnan(BV) || (BV + 1.5 * BiasAboveBV) > target_anode_voltage) {
         // fmt::print("NaN BV\n");
-        return 1.1e10;
+        cost_function_result cost_resultr_NaN;
+        cost_resultr_NaN.BV_cost    = -1.0e10;
+        cost_resultr_NaN.BP_cost    = -1.0e10;
+        cost_resultr_NaN.DW_cost    = -1.0e10;
+        cost_resultr_NaN.total_cost = -1.0e10;
+        return {length_intrinsic, doping_acceptor, BV, NAN_DOUBLE, NAN_DOUBLE, cost_resultr_NaN};
     }
 
-    // double BrP_at_Biasing            = 1.0e-3;
-    // double BV                        = 20.0;
     double meter_to_micron           = 1.0e6;
     double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV) * meter_to_micron;
     double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
     // fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
-    double cost = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
-    return cost;
+    cost_function_result cost_resultr = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
+    result_sim           full_result(length_intrinsic, doping_acceptor, BV, BrP_at_Biasing, DepletionWidth_at_Biasing, cost_resultr);
+
+    return full_result;
+}
+
+void create_map_cost_function(std::string filename) {
+    int                 Ndop             = 50;
+    int                 Nlen             = 50;
+    double              min_doping       = 16;
+    double              max_doping       = 19;
+    double              min_length       = 0.0;
+    double              max_length       = 1.0;
+    std::vector<double> length_intrinsic = utils::linspace(min_length, max_length, Nlen);
+    std::vector<double> doping_acceptor  = utils::linspace(min_doping, max_doping, Ndop);
+
+    std::vector<std::vector<double>> BV(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> BP(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> DW(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> BV_COST(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> BP_COST(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> DW_COST(Ndop, std::vector<double>(Nlen, 0.0));
+    std::vector<std::vector<double>> COST(Ndop, std::vector<double>(Nlen, 0.0));
+
+    std::cout << "Start computation over " << length_intrinsic.size() * doping_acceptor.size() << " points." << std::endl;
+    int total_done = 0;
+#pragma omp parallel for schedule(dynamic)
+    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
+        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
+            result_sim res = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
+            BV[i][j]       = res.BV;
+            BP[i][j]       = res.BrP;
+            DW[i][j]       = res.DW;
+            BV_COST[i][j]  = res.cost_result.BV_cost;
+            BP_COST[i][j]  = res.cost_result.BP_cost;
+            DW_COST[i][j]  = res.cost_result.DW_cost;
+            COST[i][j]     = res.cost_result.total_cost;
+            total_done++;
+            if (total_done % 100 == 0) {
+                std::cout << "Done: " << total_done << std::endl;
+            }
+        }
+    }
+    // Write to file with fmt
+    std::ofstream file(filename);
+    fmt::print(file, "length_intrinsic,doping_acceptor,BV,BP,DW,BV_COST,BP_COST,DW_COST,COST\n");
+    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
+        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
+            fmt::print(file,
+                       "{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e}\n",
+                       length_intrinsic[i],
+                       doping_acceptor[j],
+                       BV[i][j],
+                       BP[i][j],
+                       DW[i][j],
+                       BV_COST[i][j],
+                       BP_COST[i][j],
+                       DW_COST[i][j],
+                       COST[i][j]);
+        }
+    }
 }
 
 double cost_function(std::vector<double> variables) {
     double length_intrinsic = variables[0];
     double doping_acceptor  = variables[1];
-    double cost             = intermediate_cost_function(length_intrinsic, doping_acceptor);
+    double cost             = intermediate_cost_function(length_intrinsic, doping_acceptor).cost_result.total_cost;
     // fmt::print("Doping: {:.5e}, Length: {:.5e}, Cost: {:.5e}\n", pow(10, doping_acceptor), length_intrinsic, cost);
     return cost;
-}
-
-void create_map_cost_function(std::string filename) {
-    double min_doping = 5.0e16;
-    double max_doping = 1.0e19;
-    double min_length = 0.0;
-    double max_length = 1.0;
-    std::vector<double>              length_intrinsic = utils::linspace(0.0, 1.0, 500);
-    std::vector<double>              doping_acceptor  = utils::linspace(16.0, 19.0, 500);
-    std::vector<std::vector<double>> cost_function(length_intrinsic.size(), std::vector<double>(doping_acceptor.size(), 0.0));
-    std::cout << "Start computation over " << length_intrinsic.size()* doping_acceptor .size() << std::endl;
-    int total_done = 0;
-#pragma omp parallel for schedule(dynamic)
-    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
-        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
-            cost_function[i][j] = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
-        }
-        if (omp_get_thread_num() == 0) {
-            std::cout << "Done : " << i << " / " << length_intrinsic.size() << std::endl;
-        }
-    }
-    // Write to file with fmt
-    std::ofstream file(filename);
-    fmt::print(file, "length_intrinsic,doping_acceptor,cost\n");
-    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
-        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
-            fmt::print(file, "{:.5e},{:.5e},{:.5e}\n", length_intrinsic[i], doping_acceptor[j], cost_function[i][j]);
-        }
-    }
-    file.close();
 }
 
 int main() {
