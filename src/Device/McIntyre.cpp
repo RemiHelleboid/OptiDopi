@@ -62,12 +62,13 @@ void McIntyre::set_xline(const Eigen::VectorXd& x_line) {
     this->set_xline(m_xline);
 }
 
-void McIntyre::set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess) {
+void McIntyre::set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess, double conv_factor) {
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
     // m_electric_field = electric_field;
     m_electric_field = Utils::convol_square(electric_field, 5);
+    std::transform(m_electric_field.begin(), m_electric_field.end(), m_electric_field.begin(), [conv_factor](double x) { return x * conv_factor; });
 
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);

@@ -15,7 +15,7 @@
 int main(int argc, char** argv) {
     const std::string OUTDIR = "output/";
     device my_device;
-    my_device.setup_pin_diode(10.0, 1000, 2.0, 0.05, 1.0e19, 5.0e16, 1.0e13);
+    my_device.setup_pin_diode(10.0, 1000, 2.0, 0.0, 1.0e19, 1.0e17, 1.0e13);
     my_device.export_doping_profile("doping_profile.csv");
     double              target_anode_voltage = 40.0;
     double              tol                  = 1.0e-6;
