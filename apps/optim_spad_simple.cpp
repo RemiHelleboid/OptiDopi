@@ -9,6 +9,7 @@
 
 #include "PoissonSolver.hpp"
 #include "SimulatedAnneal.hpp"
+#include "ImpactIonization.hpp"
 #include "device.hpp"
 #include "doping_profile.hpp"
 #include "fill_vector.hpp"
@@ -187,6 +188,8 @@ double cost_function(std::vector<double> variables) {
 
 int main() {
     std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
+
+    mcintyre::export_to_file_impact_rates("impact_rates.csv");
 
     std::string DIR_RES = "results";
     if (!std::filesystem::exists(DIR_RES)) {

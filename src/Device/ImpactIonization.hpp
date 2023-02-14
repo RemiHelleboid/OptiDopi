@@ -35,7 +35,7 @@ inline double compute_band_gap(const double Temperature) {
  * @return double (1/micron)
  */
 inline double alpha_DeMan(double F_ava, const double Gamma, const double E_g) {
-    constexpr double lambda_e          = 62e-8;
+    constexpr double lambda_e          = 62e-4;
     constexpr double elementary_charge = 1.0;
     constexpr double E_threshold       = 0.0;
     constexpr double E_0               = 4.0e1;
@@ -59,7 +59,7 @@ inline double alpha_DeMan(double F_ava, const double Gamma, const double E_g) {
 }
 
 inline double beta_DeMan(double F_ava, const double Gamma, const double E_g) {
-    constexpr double lambda_h          = 45e-8;
+    constexpr double lambda_h          = 45e-4;
     constexpr double E_threshold       = 0.0;
     constexpr double elementary_charge = 1.0;
     constexpr double E_0               = 4.0e1;
@@ -67,7 +67,7 @@ inline double beta_DeMan(double F_ava, const double Gamma, const double E_g) {
     if (F_ava <= E_threshold) {
         return 0.0;
     } else if (F_ava <= E_0) {
-        double a_h                 = 1.582e4;
+        double a_h                 = 1.582e2;
         double beta                = 0.815009;
         double b_h                 = (beta * E_g) / (lambda_h * elementary_charge);
         double imapct_ionization_h = Gamma * a_h * exp(-Gamma * b_h / F_ava);
@@ -79,5 +79,22 @@ inline double beta_DeMan(double F_ava, const double Gamma, const double E_g) {
         double imapct_ionization_h = Gamma * a_h * exp(-Gamma * b_h / F_ava);
         return imapct_ionization_h;
     }
+}
+
+
+inline void export_to_file_impact_rates(const std::string filename) {
+    std::cout << "Exporting impact ionization rates to file: " << filename << std::endl;
+    double min_field = 1.0;
+    double max_field = 100.0;
+    double step      = 0.1;
+    std::ofstream file;
+    file.open(filename);
+    file << "F_ava,alpha,beta" << std::endl;
+    for (double F_ava = min_field; F_ava <= max_field; F_ava += step) {
+        double alpha = alpha_DeMan(F_ava, 1.0, 1.0);
+        double beta  = beta_DeMan(F_ava, 1.0, 1.0);
+        file << 1.0/F_ava << "," << alpha << "," << beta << std::endl;
+    }
+    file.close();
 }
 }  // namespace mcintyre

@@ -85,6 +85,7 @@ class McIntyre {
     Eigen::VectorXd             assembleSecondMemberNewton();
     void                        initial_guess(double factor = 1.0);
     void                        ComputeDampedNewtonSolution(double tolerance);
+    void                        ComputeDampedNewtonSolutionIterative(double tolerance);
     bool                        get_Solver_Has_Converged() const { return (mSolverHasConverged); };
 
     std::vector<double> get_total_breakdown_probability() const { return m_totalBreakdownProbability; }

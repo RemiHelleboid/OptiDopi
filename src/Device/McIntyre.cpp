@@ -31,22 +31,22 @@ McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperatu
     }
 }
 
-McIntyre::McIntyre(std::vector<double> x_line, std::vector<double> electric_field, double temperature) : m_temperature(temperature) {
-    m_xline                  = x_line;
-    m_electric_field         = electric_field;
-    mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
-    m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
-    mSolverHasConverged      = false;
-    m_eRateImpactIonization.resize(m_xline.size());
-    m_hRateImpactIonization.resize(m_xline.size());
-    const double Gamma = compute_gamma(m_temperature);
-    const double E_g   = compute_band_gap(m_temperature);
-    for (std::size_t idx_x = 0; idx_x < m_xline.size(); idx_x++) {
-        m_eRateImpactIonization[idx_x] = alpha_DeMan(m_electric_field[idx_x], Gamma, E_g);
-        m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
-    }
-    this->initial_guess();
-}
+// McIntyre::McIntyre(std::vector<double> x_line, std::vector<double> electric_field, double temperature) : m_temperature(temperature) {
+//     m_xline                  = x_line;
+//     m_electric_field         = electric_field;
+//     mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
+//     m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
+//     mSolverHasConverged      = false;
+//     m_eRateImpactIonization.resize(m_xline.size());
+//     m_hRateImpactIonization.resize(m_xline.size());
+//     const double Gamma = compute_gamma(m_temperature);
+//     const double E_g   = compute_band_gap(m_temperature);
+//     for (std::size_t idx_x = 0; idx_x < m_xline.size(); idx_x++) {
+//         m_eRateImpactIonization[idx_x] = alpha_DeMan(m_electric_field[idx_x], Gamma, E_g);
+//         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
+//     }
+//     this->initial_guess();
+// }
 
 void McIntyre::set_xline(std::vector<double> x_line) {
     m_xline                  = x_line;
@@ -58,7 +58,7 @@ void McIntyre::set_xline(std::vector<double> x_line) {
 }
 
 void McIntyre::set_xline(const Eigen::VectorXd& x_line) {
-    m_xline                  = std::vector<double>(x_line.data(), x_line.data() + x_line.size());
+    m_xline = std::vector<double>(x_line.data(), x_line.data() + x_line.size());
     this->set_xline(m_xline);
 }
 
@@ -68,11 +68,15 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     }
     // m_electric_field = electric_field;
     m_electric_field = Utils::convol_square(electric_field, 5);
-    std::transform(m_electric_field.begin(), m_electric_field.end(), m_electric_field.begin(), [conv_factor](double x) { return x * conv_factor; });
-
+    std::transform(m_electric_field.begin(), m_electric_field.end(), m_electric_field.begin(), [conv_factor](double x) {
+        return x * conv_factor;
+    });
+    // std::cout << "Max electric field: " << *std::max_element(m_electric_field.begin(), m_electric_field.end()) << std::endl;
+    // std::cout << "Max xline: " << *std::max_element(m_xline.begin(), m_xline.end()) << std::endl;
     const double Gamma = compute_gamma(m_temperature);
     const double E_g   = compute_band_gap(m_temperature);
     for (std::size_t idx_x = 0; idx_x < m_xline.size(); idx_x++) {
+        // std::cout << "Electric field: " << m_electric_field[idx_x] << std::endl;
         m_eRateImpactIonization[idx_x] = alpha_DeMan(m_electric_field[idx_x], Gamma, E_g);
         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
     }
@@ -159,11 +163,12 @@ Eigen::SparseMatrix<double> McIntyre::assembleMat() {
         tripletList.push_back(T(2 * i + 1, 2 * i + 1, -(1.0 / h) - 0.5 * Ai[3]));
         tripletList.push_back(T(2 * i + 1, 2 * i + 2, -0.5 * Aipp[2]));
         tripletList.push_back(T(2 * i + 1, 2 * i + 3, (1.0 / h) - 0.5 * Aipp[3]));
-        // std::cout<<"Size tripleList : "<<tripletList.size()<<std::endl;
     }
     tripletList.push_back(T(2 * N - 1, 2 * N - 1, 1.0));
     tripletList.push_back(T(2 * N - 2, 0, 1.0));
     MatA.setFromTriplets(tripletList.begin(), tripletList.end());
+    // Check if the matrix is symmetric
+
     return MatA;
 }
 
@@ -226,27 +231,87 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     int    MaxEpoch = 500;
     double factor   = 1.0;
     while (Norm_w > tolerance && epoch < MaxEpoch) {
-        MAT = assembleMat();
-        B   = assembleSecondMemberNewton();
+        double lambda = 1.0;
+        MAT           = assembleMat();
+        B             = assembleSecondMemberNewton();
         EigenSolver.factorize(MAT);
-        // std::cout << "Epoch : " << epoch << std::endl;
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
-            // double random       = factor
-            factor = factor * 0.99;
+            factor              = factor * 0.99;
             initial_guess(factor);
             mBreakdownP = m_InitialGuessBreakdownP;
             // std::cerr << "Inter error\n";
-            // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
+            std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
             epoch++;
         } else {
-            W             = EigenSolver.solve(B);
-            Norm_w        = W.norm();
-            double lambda = 1.0;
+            W      = EigenSolver.solve(B);
+            Norm_w = W.norm() / W.size();
             // double g_0    = (1.0 / 2) * Norm_w * Norm_w;
             mBreakdownP = mBreakdownP + lambda * W;
             epoch++;
         }
+        // std::cout << "epoch = " << epoch << " Norm_w = " << Norm_w << std::endl;
+    }
+    if (Norm_w > tolerance && epoch == MaxEpoch) {
+        mSolverHasConverged = false;
+        std::cerr << "NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
+        mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
+        m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
+        m_hBreakdownProbability                       = std::vector<double>(N, 0.0);
+        m_totalBreakdownProbability                   = std::vector<double>(N, 0.0);
+        auto                          end             = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end - start;
+        m_McIntyre_time += elapsed_seconds.count();
+        return;
+    } else {
+        mSolverHasConverged      = true;
+        m_InitialGuessBreakdownP = mBreakdownP;
+        std::vector<double> eBrPVector(N);
+        std::vector<double> hBrPVector(N);
+        std::vector<double> BrPVector(N);
+        for (std::size_t k = 0; k < N; ++k) {
+            eBrPVector[k] = mBreakdownP[2 * k];
+            hBrPVector[k] = mBreakdownP[2 * k + 1];
+            if ((eBrPVector[k] > 1) || (eBrPVector[k] < 1e-8)) {
+                eBrPVector[k] = 0.0;
+            }
+            if ((hBrPVector[k] > 1) || (hBrPVector[k] < 1e-8)) {
+                hBrPVector[k] = 0.0;
+            }
+            BrPVector[k] = eBrPVector[k] + hBrPVector[k] - eBrPVector[k] * hBrPVector[k];
+        }
+        m_eBreakdownProbability     = eBrPVector;
+        m_hBreakdownProbability     = hBrPVector;
+        m_totalBreakdownProbability = BrPVector;
+    }
+    auto                          end             = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    m_McIntyre_time += elapsed_seconds.count();
+}
+
+void McIntyre::ComputeDampedNewtonSolutionIterative(double tolerance) {
+    auto            start  = std::chrono::high_resolution_clock::now();
+    std::size_t     N      = m_xline.size();
+    double          Norm_w = 1e10;
+    int             epoch  = 0;
+    Eigen::VectorXd W(2 * N);
+    Eigen::VectorXd W_new(2 * N);
+    mBreakdownP                                       = m_InitialGuessBreakdownP;
+    Eigen::SparseMatrix<double>                   MAT = assembleMat();
+    Eigen::VectorXd                               B   = assembleSecondMemberNewton();
+    Eigen::BiCGSTAB<Eigen::SparseMatrix<double> > solver;
+    int                                           MaxEpoch = 500;
+    double                                        factor   = 1.0;
+    while (Norm_w > tolerance && epoch < MaxEpoch) {
+        MAT = assembleMat();
+        B   = assembleSecondMemberNewton();
+        solver.compute(MAT);
+        W             = solver.solve(B);
+        Norm_w        = W.norm();
+        double lambda = 1.0;
+        // double g_0    = (1.0 / 2) * Norm_w * Norm_w;
+        mBreakdownP = mBreakdownP + lambda * W;
+        epoch++;
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
