@@ -10,9 +10,9 @@
 #include <random>
 #include <vector>
 
+#include "McIntyre.hpp"
 #include "Physics.hpp"
 #include "doping_profile.hpp"
-#include "McIntyre.hpp"
 
 typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> SolverSparseLU;
 
@@ -61,7 +61,9 @@ class NewtonPoissonSolver {
     std::vector<double>          m_list_voltages;
     std::vector<PoissonSolution> m_list_poisson_solutions;
 
-    mcintyre::McIntyre           m_mcintyre_solver;
+    mcintyre::McIntyre m_mcintyre_solver;
+    bool               m_solve_with_mcintyre   = false;
+    double             m_step_voltage_mcintyre = 0.0;
 
     static double m_poisson_solver_time;
 
@@ -87,6 +89,10 @@ class NewtonPoissonSolver {
     void   compute_right_hand_side();
 
     void newton_solver(const double final_anode_voltage, const double tolerance, const int max_iterations, double voltage_step);
+    void newton_solver_with_mcintyre(const double final_anode_voltage,
+                                     const double tolerance,
+                                     const int    max_iterations,
+                                     double       voltage_step);
 
     double              get_depletion_width(const double epsilon) const;
     std::vector<double> get_list_depletion_width(const double epsilon) const;

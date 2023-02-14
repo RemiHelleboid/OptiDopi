@@ -62,7 +62,9 @@ class McIntyre {
     //! Flag to know the status of the convergence
     bool mSolverHasConverged = false;
 
-    static double m_McIntyre_time;
+    static double      m_McIntyre_time;
+    static std::size_t m_total_number_sim;
+    static std::size_t m_converged_sim;
 
  public:
     McIntyre() = default;
@@ -70,12 +72,14 @@ class McIntyre {
     McIntyre(std::vector<double> x_line, double temperature = 300.0);
     ~McIntyre(){};
 
-    static double get_mcintyre_time() { return m_McIntyre_time; }
+    static double      get_mcintyre_time() { return m_McIntyre_time; }
+    static std::size_t get_total_number_sim() { return m_total_number_sim; }
+    static std::size_t get_converged_sim() { return m_converged_sim; }
+    static double      get_ratio_converged_sim() { return static_cast<double>(m_converged_sim) / static_cast<double>(m_total_number_sim); }
 
     void set_xline(std::vector<double> x_line);
     void set_xline(const Eigen::VectorXd& x_line);
     void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess = true, double conv_factor = 1.0);
-
 
     double                      dPe_func(double Pe, double Ph, int index);
     double                      dPh_func(double Pe, double Ph, int index);
@@ -83,7 +87,8 @@ class McIntyre {
     std::vector<double>         computeA(int i, double Pe, double Ph);
     Eigen::SparseMatrix<double> assembleMat();
     Eigen::VectorXd             assembleSecondMemberNewton();
-    void                        initial_guess(double factor = 1.0);
+    Eigen::VectorXd             assembleSecondMemberNewton(Eigen::VectorXd breakdownP);
+    void                        initial_guess(double eBrP = 0.8, double hBrP = 0.4);
     void                        ComputeDampedNewtonSolution(double tolerance);
     void                        ComputeDampedNewtonSolutionIterative(double tolerance);
     bool                        get_Solver_Has_Converged() const { return (mSolverHasConverged); };

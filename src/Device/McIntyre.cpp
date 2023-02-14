@@ -16,6 +16,8 @@
 namespace mcintyre {
 
 double McIntyre::m_McIntyre_time = 0.0;
+std::size_t McIntyre::m_total_number_sim = 0;
+std::size_t McIntyre::m_converged_sim = 0;
 
 McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperature(temperature), m_xline(x_line) {
     mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
@@ -193,15 +195,15 @@ Eigen::VectorXd McIntyre::assembleSecondMemberNewton() {
 /*! \brief Computes an initial guess for the Newton solver algorithm.
  *
  *  \return std::vector<double> Y the initial guess. */
-void McIntyre::initial_guess(double factor) {
+void McIntyre::initial_guess(double eBrP, double hBrP) {
     int                 NbPoints                      = m_xline.size();
     auto                index_max_electric_field      = std::max_element(m_electric_field.begin(), m_electric_field.end());
     double              length_peack_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
     std::vector<double> eInitialBrP(NbPoints);
     std::vector<double> hInitialBrP(NbPoints);
     for (int i = 0; i < NbPoints; i++) {
-        eInitialBrP[i] = factor * 0.8 * (m_xline[i] >= length_peack_triggering_force);
-        hInitialBrP[i] = factor * 0.4 * (m_xline[i] < length_peack_triggering_force);
+        eInitialBrP[i] = eBrP * (m_xline[i] >= length_peack_triggering_force);
+        hInitialBrP[i] = hBrP * (m_xline[i] < length_peack_triggering_force);
     }
     // Smooth the initial guess
     eInitialBrP = Utils::convol_square(eInitialBrP, 5);
@@ -222,7 +224,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     double          Norm_w = 1e10;
     int             epoch  = 0;
     Eigen::VectorXd W(2 * N);
-    Eigen::VectorXd W_new(2 * N);
+    Eigen::VectorXd W_old(2 * N);
     mBreakdownP                                       = m_InitialGuessBreakdownP;
     Eigen::SparseMatrix<double>                   MAT = assembleMat();
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
@@ -230,6 +232,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     EigenSolver.analyzePattern(MAT);
     int    MaxEpoch = 500;
     double factor   = 1.0;
+    double lambda   = 1.0;
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         double lambda = 1.0;
         MAT           = assembleMat();
@@ -237,20 +240,21 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         EigenSolver.factorize(MAT);
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
-            factor              = factor * 0.99;
-            initial_guess(factor);
+            factor              = factor * 1.05;
+            initial_guess(0.95, 0.95<);
             mBreakdownP = m_InitialGuessBreakdownP;
             // std::cerr << "Inter error\n";
             std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
+            // lambda *= 0.5;
             epoch++;
         } else {
-            W      = EigenSolver.solve(B);
-            Norm_w = W.norm() / W.size();
-            // double g_0    = (1.0 / 2) * Norm_w * Norm_w;
+            W           = EigenSolver.solve(B);
+            W_old       = W;
+            Norm_w      = W.norm() / sqrt(2 * N);
             mBreakdownP = mBreakdownP + lambda * W;
             epoch++;
         }
-        // std::cout << "epoch = " << epoch << " Norm_w = " << Norm_w << std::endl;
+        std::cout << "epoch = " << epoch << " Norm_w = " << Norm_w << std::endl;
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
@@ -262,9 +266,12 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         auto                          end             = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed_seconds = end - start;
         m_McIntyre_time += elapsed_seconds.count();
+        m_total_number_sim++;
         return;
     } else {
-        mSolverHasConverged      = true;
+        mSolverHasConverged = true;
+        m_total_number_sim++;
+        m_converged_sim++;
         m_InitialGuessBreakdownP = mBreakdownP;
         std::vector<double> eBrPVector(N);
         std::vector<double> hBrPVector(N);
