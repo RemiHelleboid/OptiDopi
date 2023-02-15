@@ -47,6 +47,7 @@ class device {
                          double      donor_level,
                          double      acceptor_level,
                          double      intrisic_level);
+   
     
 
     void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }

@@ -18,6 +18,7 @@
 // Set number of threads
 
 #define NAN_DOUBLE std::numeric_limits<double>::quiet_NaN()
+static int idx = 0;
 
 struct cost_function_result {
     double BV_cost;
@@ -82,8 +83,9 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 
     device my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
-    my_device.smooth_doping_profile(20);
-    std::string filename = fmt::format("results/doping_profile_{:.5e}_{:.5e}.csv", length_intrinsic, doping_acceptor);
+    my_device.smooth_doping_profile(5);
+    idx++;
+    std::string filename = fmt::format("results/thread_{}/doping_profile_{}.csv", thread_id, idx);
     my_device.export_doping_profile(filename);
 
     double    target_anode_voltage = 40.0;
@@ -121,8 +123,8 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 }
 
 void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 8;
-    int                 Nlen             = 8;
+    int                 Ndop             = 100;
+    int                 Nlen             = 100;
     double              min_doping       = 16;
     double              max_doping       = 19;
     double              min_length       = 0.0;
@@ -164,7 +166,7 @@ void create_map_cost_function(std::string filename) {
     for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
         for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
             fmt::print(file,
-                       "{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e}\n",
+                       "{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e}\n",
                        length_intrinsic[i],
                        doping_acceptor[j],
                        BV[i][j],
@@ -189,7 +191,7 @@ double cost_function(std::vector<double> variables) {
 int main() {
     std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
 
-    mcintyre::export_to_file_impact_rates("impact_rates.csv");
+    // mcintyre::export_to_file_impact_rates("impact_rates.csv");
 
     std::string DIR_RES = "results";
     if (!std::filesystem::exists(DIR_RES)) {
@@ -198,29 +200,20 @@ int main() {
         std::filesystem::remove_all(DIR_RES);
         std::filesystem::create_directory(DIR_RES);
     }
-    create_map_cost_function("main_cost_function.csv");
-
-    double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
-    double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
-    double ration_converged_mcintyre = mcintyre::McIntyre::get_ratio_converged_sim() * 100.0;
-    fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
-    fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
-    fmt::print("Ratio of converged simulations: {:.2f}% \n", ration_converged_mcintyre);
-    exit(0);
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 250;
-    double          initial_temp     = 10;
+    std::size_t     max_iter         = 2000;
+    double          initial_temp     = 100;
     double          final_temp       = 0.001;
     std::size_t     nb_parameters    = 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
 
-    double min_doping = 5.0e16;
+    double min_doping = 1.0e16;
     double max_doping = 1.0e19;
     double min_length = 0.0;
-    double max_length = 1.0;
+    double max_length = 2.0;
 
-    int nb_threads = 4;
+    int nb_threads = 1;
     std::cout << "Number of threads: " << nb_threads << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_threads);
@@ -234,13 +227,13 @@ int main() {
         std::filesystem::create_directory(directory);
 
         SimulatedAnnealing sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function);
-        sa.set_prefix_name(fmt::format("{}/thread_{}_", DIR_RES, i));
+        sa.set_prefix_name(fmt::format("{}/thread_{}/", DIR_RES, i));
         sa.set_bounds({{min_length, max_length}, {log10(min_doping), log10(max_doping)}});
         sa.set_alpha_cooling(0.99);
         double length_intrinsic = 0.01;
         double doping_acceptor  = 5.0e16;
-        // sa.set_initial_solution({length_intrinsic, log10(doping_acceptor)});
-        sa.create_random_initial_solution();
+        sa.set_initial_solution({2.0, log10(1.0e16)});
+        // sa.create_random_initial_solution();
         sa.run();
         // Get best solution
         std::vector<double> best_solution = sa.get_best_solution();
@@ -268,5 +261,18 @@ int main() {
     std::cout << "Length: " << length_intrinsic << std::endl;
     std::cout << "Doping: " << log_doping_acceptor << std::endl;
     intermediate_cost_function(length_intrinsic, log_doping_acceptor);
+
+
+
+        // create_map_cost_function("main_cost_function.csv");
+
+    double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
+    double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();
+    double ration_converged_mcintyre = mcintyre::McIntyre::get_ratio_converged_sim() * 100.0;
+    fmt::print("Total time spent in Poisson solver: {} s \n", poisson_time);
+    fmt::print("Total time spent in McIntyre solver: {} s \n", mcintyre_time);
+    fmt::print("Ratio of converged simulations: {:.2f}% \n", ration_converged_mcintyre);
+    exit(0);
+
 
 }

@@ -88,12 +88,12 @@ void SimulatedAnnealing::logarithmic_cooling() { m_temperature = m_initial_tempe
 
 std::vector<double> SimulatedAnnealing::neighbour_function() {
     std::vector<double>                    new_solution = m_current_solution;
-    double                                 factor       = 1.0 - (double)m_current_iteration / (double)m_max_iterations;
+    double                                 factor       = std::pow(0.95, m_current_iteration);
     std::uniform_real_distribution<double> distribution_(-1.0, 1.0);
 
     for (std::size_t i = 0; i < m_nb_variables; ++i) {
         double range = m_bounds[i].second - m_bounds[i].first;
-        new_solution[i] += distribution_(m_generator) * range * factor * 0.1;
+        new_solution[i] += distribution_(m_generator) * range * factor;
     }
     return clip_variables(new_solution);
 }
