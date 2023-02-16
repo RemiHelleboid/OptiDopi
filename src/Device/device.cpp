@@ -31,6 +31,24 @@ void device::setup_pin_diode(double      xlenght,
         .set_up_pin_diode(0.0, xlenght, number_points, length_donor, length_intrinsic, donor_level, acceptor_level, intrisic_level);
 }
 
+void device::set_up_complex_diode(double              xlength,
+                                  std::size_t         number_points,
+                                  double              length_donor,
+                                  double              length_intrinsic,
+                                  double              donor_level,
+                                  double              intrisic_level,
+                                  std::vector<double> list_acceptor_level,
+                                  std::vector<double> list_acceptor_width) {
+    m_doping_profile.set_up_advanced_pin(xlength,
+                                         number_points,
+                                         length_donor,
+                                         length_intrinsic,
+                                         donor_level,
+                                         intrisic_level,
+                                         list_acceptor_level,
+                                         list_acceptor_width);
+}
+
 void device::smooth_doping_profile(int window_size) { m_doping_profile.smooth_doping_profile(window_size); }
 
 void device::solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations) {
@@ -65,7 +83,7 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     // std::cout << "Max x = " << x_line_micron.back() << std::endl;
     double tol               = 1e-6;
     double breakdown_voltage = 0.0;
-    double cm_to_micron    = 1.0e-4;
+    double cm_to_micron      = 1.0e-4;
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += index_step_int) {
         // std::cout << "Voltage = " << m_list_voltages[idx_voltage] << std::endl;
         m_mcintyre_solver.set_electric_field(m_list_poisson_solutions[idx_voltage].m_electric_field, true, cm_to_micron);
@@ -142,10 +160,10 @@ double device::extract_breakdown_voltage(double brp_threshold) const {
     double      brp          = list_total_breakdown_probability[idx_voltage];
     double      brp_prev     = list_total_breakdown_probability[idx_voltage - 1];
     double      voltage_prev = m_list_mcintyre_voltages[idx_voltage - 1];
-    double m_slope = (brp - brp_prev) / (voltage - voltage_prev);
-    double m_intercept = brp - m_slope * voltage;
+    double      m_slope      = (brp - brp_prev) / (voltage - voltage_prev);
+    double      m_intercept  = brp - m_slope * voltage;
     // std::cout << "Original BV: " << voltage << std::endl;
-    // std::cout << "Interpolated BV: " << (brp_threshold - m_intercept) / m_slope << std::endl << std::endl;  
+    // std::cout << "Interpolated BV: " << (brp_threshold - m_intercept) / m_slope << std::endl << std::endl;
     return (brp_threshold - m_intercept) / m_slope;
 }
 
