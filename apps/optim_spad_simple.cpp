@@ -202,8 +202,8 @@ int main() {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 2000;
-    double          initial_temp     = 100;
+    std::size_t     max_iter         = 50;
+    double          initial_temp     = 1000;
     double          final_temp       = 0.001;
     std::size_t     nb_parameters    = 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
@@ -213,7 +213,7 @@ int main() {
     double min_length = 0.0;
     double max_length = 2.0;
 
-    int nb_threads = 1;
+    int nb_threads = 4;
     std::cout << "Number of threads: " << nb_threads << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_threads);
@@ -229,7 +229,7 @@ int main() {
         SimulatedAnnealing sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function);
         sa.set_prefix_name(fmt::format("{}/thread_{}/", DIR_RES, i));
         sa.set_bounds({{min_length, max_length}, {log10(min_doping), log10(max_doping)}});
-        sa.set_alpha_cooling(0.99);
+        sa.set_alpha_cooling(0.98);
         double length_intrinsic = 0.01;
         double doping_acceptor  = 5.0e16;
         sa.set_initial_solution({2.0, log10(1.0e16)});
