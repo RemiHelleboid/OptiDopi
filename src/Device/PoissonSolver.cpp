@@ -197,12 +197,6 @@ void NewtonPoissonSolver::compute_initial_guess() {
     }
     // Take the opposite of the solution
     m_solution = -m_solution;
-    // Export the initial guess to a file
-    std::ofstream file("initial_guess.csv");
-    for (std::size_t index_x = 0; index_x < m_x_line.size(); ++index_x) {
-        file << m_x_line(index_x) << "," << m_solution(index_x) << std::endl;
-    }
-    file.close();
 }
 
 double NewtonPoissonSolver::compute_boundary_conditions(const double applied_voltage, const double doping) {

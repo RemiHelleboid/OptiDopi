@@ -47,8 +47,15 @@ class device {
                          double      donor_level,
                          double      acceptor_level,
                          double      intrisic_level);
-   
-    
+
+    void set_up_complex_diode(double              xlength,
+                              std::size_t         number_points,
+                              double              length_donor,
+                              double              length_intrinsic,
+                              double              donor_level,
+                              double              intrisic_level,
+                              std::vector<double> list_x_acceptor,
+                              std::vector<double> list_acceptor_level);
 
     void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
     void smooth_doping_profile(int window_size);

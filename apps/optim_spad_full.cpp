@@ -24,7 +24,6 @@ static int idx = 0;
 static std::string filename = "optim_path_full.csv";
 std::ofstream file_path(filename);
 
-
 struct cost_function_result {
     double BV_cost;
     double BP_cost;
@@ -98,7 +97,6 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     const int max_iter             = 100;
     double    voltage_step         = 0.01;
     my_device.solve_poisson(target_anode_voltage, tol, max_iter);
-    // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
 
     const double stop_above_bv         = 5.0;
     double       mcintyre_voltage_step = 0.25;
@@ -107,7 +105,6 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
     double       BiasAboveBV   = 3.0;
     if (std::isnan(BV) || (BV + 1.5 * BiasAboveBV) > target_anode_voltage) {
-        // fmt::print("NaN BV\n");
         cost_function_result cost_resultr_NaN;
         cost_resultr_NaN.BV_cost    = -1.0e10;
         cost_resultr_NaN.BP_cost    = +1.0e10;
@@ -119,8 +116,6 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     double meter_to_micron           = 1.0e6;
     double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV) * meter_to_micron;
     double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
-    // fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
-    // Put the result in the log file
     fmt::print(file_path, "{:.5e},{:.5e},{:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
     cost_function_result cost_resultr = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
@@ -129,63 +124,6 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     return full_result;
 }
 
-void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 100;
-    int                 Nlen             = 100;
-    double              min_doping       = 16;
-    double              max_doping       = 19;
-    double              min_length       = 0.0;
-    double              max_length       = 1.0;
-    std::vector<double> length_intrinsic = utils::linspace(min_length, max_length, Nlen);
-    std::vector<double> doping_acceptor  = utils::linspace(min_doping, max_doping, Ndop);
-
-    std::vector<std::vector<double>> BV(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> BP(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> DW(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> BV_COST(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> BP_COST(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> DW_COST(Ndop, std::vector<double>(Nlen, 0.0));
-    std::vector<std::vector<double>> COST(Ndop, std::vector<double>(Nlen, 0.0));
-
-    std::cout << "Start computation over " << length_intrinsic.size() * doping_acceptor.size() << " points." << std::endl;
-    int total_done = 0;
-#pragma omp parallel for schedule(dynamic)
-    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
-        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
-            // std::cout << "Intrinsic length: " << length_intrinsic[i] << ", doping: " << doping_acceptor[j] << std::endl;
-            result_sim res = intermediate_cost_function(length_intrinsic[i], doping_acceptor[j]);
-            BV[i][j]       = res.BV;
-            BP[i][j]       = res.BrP;
-            DW[i][j]       = res.DW;
-            BV_COST[i][j]  = res.cost_result.BV_cost;
-            BP_COST[i][j]  = res.cost_result.BP_cost;
-            DW_COST[i][j]  = res.cost_result.DW_cost;
-            COST[i][j]     = res.cost_result.total_cost;
-            total_done++;
-            if (total_done % 100 == 0) {
-                std::cout << "Done: " << total_done << std::endl;
-            }
-        }
-    }
-    // Write to file with fmt
-    std::ofstream file(filename);
-    fmt::print(file, "length_intrinsic,doping_acceptor,BV,BP,DW,BV_COST,BP_COST,DW_COST,COST\n");
-    for (std::size_t i = 0; i < length_intrinsic.size(); i++) {
-        for (std::size_t j = 0; j < doping_acceptor.size(); j++) {
-            fmt::print(file,
-                       "{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e},{:.5e}\n",
-                       length_intrinsic[i],
-                       doping_acceptor[j],
-                       BV[i][j],
-                       BP[i][j],
-                       DW[i][j],
-                       BV_COST[i][j],
-                       BP_COST[i][j],
-                       DW_COST[i][j],
-                       COST[i][j]);
-        }
-    }
-}
 
 double cost_function(std::vector<double> variables) {
     double length_intrinsic = variables[0];
@@ -195,14 +133,8 @@ double cost_function(std::vector<double> variables) {
     return cost;
 }
 
-int main() {
-    std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
-
-
-    file_path << "BV,BrP,DW\n";
-
-    // mcintyre::export_to_file_impact_rates("impact_rates.csv");
-
+int main(int argc, const char** argv) {
+    
     std::string DIR_RES = "results";
     if (!std::filesystem::exists(DIR_RES)) {
         std::filesystem::create_directory(DIR_RES);
@@ -286,4 +218,8 @@ int main() {
     exit(0);
 
 
+
+
+
+    return 0;
 }

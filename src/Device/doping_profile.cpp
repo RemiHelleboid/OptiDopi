@@ -21,6 +21,14 @@
 #include "fill_vector.hpp"
 #include "smoother.hpp"
 
+std::pair<double, double> exponential_link_parameters(double x0, double x1, double y0, double y1) {
+    double alpha = log(y1 / y0) / (x1 - x0);
+    double beta  = y0 / exp(alpha * x0);
+    return std::make_pair(alpha, beta);
+}
+
+double exponential_link(double x, double alpha, double beta) { return beta * exp(alpha * x); }
+
 doping_profile::doping_profile(double x_min, double x_max, std::size_t number_points)
     : m_x_line(utils::linspace(x_min, x_max, number_points)),
       m_acceptor_concentration(number_points, 0.0),
@@ -74,20 +82,57 @@ void doping_profile::set_up_pin_diode(double      x_min,
     re_compute_total_doping();
 }
 
-void doping_profile::set_up_advanced_spad(double              total_length,
-                                          std::size_t         nb_points,
-                                          double              length_donor,
-                                          double              length_intrinsic,
-                                          double              donor_level,
-                                          double              intrinsic_level,
-                                          std::vector<double> acceptor_positions,
-                                          std::vector<double> acceptor_concentrations) {
-    m_x_line = utils::linspace(0.0, total_length, nb_points);
+void doping_profile::set_up_advanced_pin(double              xlength,
+                                         std::size_t         number_points,
+                                         double              length_donor,
+                                         double              length_intrinsic,
+                                         double              donor_level,
+                                         double              intrisic_level,
+                                         std::vector<double> list_x_acceptor,
+                                         std::vector<double> list_acceptor_level) {
+    if (list_x_acceptor.size() != list_acceptor_level.size()) {
+        throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
+    }
+    if (list_x_acceptor.back() > xlength) {
+        throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
+    }
+
+    m_x_line = utils::linspace(0.0, xlength, number_points);
     m_donor_concentration.clear();
     m_acceptor_concentration.clear();
-    m_donor_concentration.resize(nb_points);
-    m_acceptor_concentration.resize(nb_points);
-    
+    m_donor_concentration.resize(number_points);
+    m_acceptor_concentration.resize(number_points);
+
+    for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
+        double x_position = m_x_line[index_x];
+        if (x_position <= length_donor) {
+            m_donor_concentration[index_x]    = donor_level;
+            m_acceptor_concentration[index_x] = 0.0;
+        } else if (x_position <= length_donor + length_intrinsic) {
+            m_donor_concentration[index_x]    = intrisic_level;
+            m_acceptor_concentration[index_x] = 0.0;
+        } else {
+            break;
+        }
+    }
+    int nb_acceptor = list_x_acceptor.size();
+
+    for (std::size_t idx_acc = 0; idx_acc < nb_acceptor; ++idx_acc) {
+        double x_init     = list_x_acceptor[idx_acc];
+        double x_end      = list_x_acceptor[idx_acc + 1];
+        double y_init     = list_acceptor_level[idx_acc];
+        double y_end      = list_acceptor_level[idx_acc + 1];
+        auto   alpha_beta = exponential_link_parameters(x_init, x_end, y_init, y_end);
+        double alpha      = alpha_beta.first;
+        double beta       = alpha_beta.second;
+        for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
+            double x_position = m_x_line[index_x];
+            if (x_position >= x_init && x_position <= x_end) {
+                m_acceptor_concentration[index_x] = exponential_link(x_position, alpha, beta);
+            }
+        }
+    }
+    re_compute_total_doping();
 }
 
 void doping_profile::export_doping_profile(const std::string& filename) const {
