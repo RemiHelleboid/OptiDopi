@@ -140,12 +140,12 @@ int main() {
     std::vector<double> min_values = {min_length, log10(min_doping)};
     std::vector<double> max_values = {max_length, log10(max_doping)};
 
-    std::size_t max_iter      = 50;
+    std::size_t max_iter      = 200;
     std::size_t nb_parameters = 2;
     std::size_t nb_particles  = 16;
-    double      c1            = 2.;
-    double      c2            = 2.;
-    double      w             = 0.95;
+    double      c1            = 2.0;
+    double      c2            = 2.0;
+    double      w             = 0.8;
 
     Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);

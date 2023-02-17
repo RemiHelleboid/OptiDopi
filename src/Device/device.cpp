@@ -203,7 +203,7 @@ double device::get_depletion_at_voltage(double voltage) const {
 }
 
 cost_function_result device::compute_cost_function(double voltage_above_breakdown) const {
-    const double alpha_BV                     = 1000.0;
+    const double alpha_BV                     = 10000.0;
     const double alpha_BP                     = 100.0;
     const double alpha_DW                     = 100.0;
     const double alpha_tot_acceptor           = 50.0;
