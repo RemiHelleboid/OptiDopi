@@ -44,7 +44,6 @@ struct result_sim {
 };
 
 result_sim intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
-    // std::cout << "Running intermediate cost function" << std::endl;
     std::size_t number_points    = 400;
     double      total_length     = 10.0;
     double      length_donor     = 0.5;
@@ -66,6 +65,17 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     double    voltage_step         = 0.01;
     my_device.solve_poisson(target_anode_voltage, tol, max_iter);
     // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
+    bool poisson_success = my_device.get_poisson_success();
+    if (!poisson_success) {
+        fmt::print("Poisson failed\n");
+        cost_function_result cost_resultr_NaN;
+        cost_resultr_NaN.BV_cost    = -1.0e10;
+        cost_resultr_NaN.BP_cost    = +1.0e10;
+        cost_resultr_NaN.DW_cost    = +1.0e10;
+        cost_resultr_NaN.total_cost = +1.0e10;
+
+        return {length_intrinsic, doping_acceptor, NAN_DOUBLE, NAN_DOUBLE, NAN_DOUBLE, cost_resultr_NaN};
+    }
 
     const double stop_above_bv         = 5.0;
     double       mcintyre_voltage_step = 0.25;
@@ -89,7 +99,7 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
     // fmt::print("BV: {:.5e}, BrP: {:.5e}, DW: {:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
     // Put the result in the log file
-    fmt::print(file_path, "{:.5e},{:.5e},{:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
+    // fmt::print(file_path, "{:.5e},{:.5e},{:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
     cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
     result_sim           full_result(length_intrinsic, doping_acceptor, BV, BrP_at_Biasing, DepletionWidth_at_Biasing, cost_resultr);

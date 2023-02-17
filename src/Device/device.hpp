@@ -68,6 +68,7 @@ class device {
     void smooth_doping_profile(int window_size);
 
     void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
+    bool get_poisson_success() const { return m_poisson_solver.get_solver_success(); } 
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
 
     const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }

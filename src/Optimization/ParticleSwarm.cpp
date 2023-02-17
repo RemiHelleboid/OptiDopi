@@ -29,11 +29,11 @@ ParticleSwarm::ParticleSwarm(std::size_t                                       n
       m_number_dimensions(number_dimensions),
       m_fitness_function(fitness_function) {
     m_particles.resize(m_number_particles);
-    for (auto& particle : m_particles) {
-        particle.position.resize(m_number_dimensions);
-        particle.velocity.resize(m_number_dimensions);
-        particle.best_position.resize(m_number_dimensions);
+    for (std::size_t i = 0; i < m_number_particles; ++i) {
+        m_particles[i].set_dimensions(m_number_dimensions);
+        m_particles[i].seed_random_engine();
     }
+
     m_best_position.resize(m_number_dimensions);
     this->set_up_export();
     m_random_engine.seed(m_random_device());
@@ -59,9 +59,9 @@ void ParticleSwarm::initialize_particles() {
     for (std::size_t idx_particle = 0; idx_particle < m_number_particles; ++idx_particle) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
             double range = m_bounds_max[i] - m_bounds_min[i];
-            m_particles[idx_particle].position[i] = m_bounds_min[i] + range * m_uniform_distribution(m_random_engine);
+            m_particles[idx_particle].position[i] = m_bounds_min[i] + range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
             // Velocity is initialized between -abs(max - min) and abs(max - min)
-            m_particles[idx_particle].velocity[i] = -range + 2.0 * range * m_uniform_distribution(m_random_engine);
+            m_particles[idx_particle].velocity[i] = -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
         }
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
         m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
@@ -105,10 +105,11 @@ void ParticleSwarm::update_particles() {
             particle.best_position = particle.position;
             particle.best_fitness  = fitness;
         }
-# pragma omp critical
-        if (fitness < m_best_fitness) {
-            m_best_position = particle.position;
-            m_best_fitness  = fitness;
+    }
+    for (std::size_t i = 0; i < m_number_particles; ++i) {
+        if (m_particles[i].best_fitness < m_best_fitness) {
+            m_best_position = m_particles[i].position;
+            m_best_fitness  = m_particles[i].best_fitness;
         }
     }
 }

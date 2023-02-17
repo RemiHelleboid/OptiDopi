@@ -24,6 +24,30 @@ struct Particle {
     std::vector<double> velocity;
     std::vector<double> best_position;
     double              best_fitness;
+    std::mt19937        m_random_engine;
+
+    Particle() = default;
+
+    Particle(std::size_t number_dimensions) {
+        position.resize(number_dimensions);
+        velocity.resize(number_dimensions);
+        best_position.resize(number_dimensions);
+        std::random_device random_device;
+        m_random_engine.seed(random_device());
+    }
+
+    void set_dimensions(std::size_t number_dimensions) {
+        position.resize(number_dimensions);
+        velocity.resize(number_dimensions);
+        best_position.resize(number_dimensions);
+    }
+
+    void seed_random_engine() {
+        std::random_device random_device;
+        m_random_engine.seed(random_device());
+    }
+
+    std::mt19937& get_random_engine() { return m_random_engine; }
 };
 
 class ParticleSwarm {

@@ -104,8 +104,8 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
 }
 
 void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 100;
-    int                 Nlen             = 100;
+    int                 Ndop             = 25;
+    int                 Nlen             = 25;
     double              min_doping       = 16;
     double              max_doping       = 19;
     double              min_length       = 0.0;
@@ -172,6 +172,7 @@ double cost_function(std::vector<double> variables) {
 int main() {
     std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
 
+    create_map_cost_function("main_cost_function2.csv");
 
     file_path << "BV,BrP,DW\n";
 
@@ -248,7 +249,6 @@ int main() {
 
 
 
-        // create_map_cost_function("main_cost_function.csv");
 
     double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
     double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();

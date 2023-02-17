@@ -19,11 +19,11 @@
 #include <sstream>
 #include <vector>
 
+#include "McIntyre.hpp"
 #include "Physics.hpp"
 #include "doping_profile.hpp"
 #include "gradient.hpp"
 #include "smoother.hpp"
-#include "McIntyre.hpp"
 
 double NewtonPoissonSolver::m_poisson_solver_time = 0.0;
 
@@ -32,9 +32,9 @@ double compute_depletion_width(const Eigen::VectorXd& electron_density,
                                const Eigen::VectorXd& hole_density,
                                const Eigen::VectorXd& doping_concentration,
                                const double           epsilon) {
-    constexpr double m3_to_cm3 = 1.0e6;
-    Eigen::VectorXd depletion_shape     = electron_density - hole_density;
-    std::size_t     sum_depleted_points = 0;
+    constexpr double m3_to_cm3           = 1.0e6;
+    Eigen::VectorXd  depletion_shape     = electron_density - hole_density;
+    std::size_t      sum_depleted_points = 0;
     for (unsigned int idx_x = 0; idx_x < x_line.size(); ++idx_x) {
         depletion_shape(idx_x) /= doping_concentration(idx_x) * m3_to_cm3;
         depletion_shape(idx_x) = fabs(depletion_shape(idx_x));
@@ -111,7 +111,7 @@ NewtonPoissonSolver::NewtonPoissonSolver(const Eigen::VectorXd& doping_concentra
     m_hole_density.resize(m_x_line.size());
     m_total_charge.resize(m_x_line.size());
     m_derivative_total_charge.resize(m_x_line.size());
-    
+
     m_mcintyre_solver.set_xline(m_x_line);
 }
 
@@ -273,13 +273,13 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     // fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
 
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
-
     compute_initial_guess();
     compute_total_charge(cathode_voltage, anode_voltage);
     compute_derivative_total_charge(cathode_voltage, anode_voltage);
     compute_matrix();
     update_matrix();
     compute_right_hand_side();
+
     m_solver.analyzePattern(m_matrix);
 
     Eigen::VectorXd m_new_solution(m_x_line.size());
@@ -297,6 +297,11 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
             update_matrix();
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
+            if (m_solver.info() != Eigen::Success) {
+                std::cout << "Factorization failed. Poisson failed." << std::endl;
+                m_solver_success = false;
+                return;
+            }
             m_new_solution = m_solver.solve(m_vector_rhs);
             residual       = m_new_solution.norm();
             m_solution += lambda * m_new_solution;
@@ -304,23 +309,27 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
             m_solution(m_x_line.size() - 1) = compute_boundary_conditions(cathode_voltage, doping_cathode);
         }
         if (index_iteration == max_iterations) {
-            std::cout << "Maximum number of iterations reached" << std::endl;
+            std::cout << "Maximum number of iterations reached. Poisson failed." << std::endl;
+            m_solver_success = false;
+            return;
             // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
-            
-        }
-        // Transform solution into std::vector
-        std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
-        std::vector<double> electric_field_vector = Utils::gradient(m_xline_vector, solution_vector);
-        constexpr double    cm_to_m               = 1.0e-2;
-        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value *= cm_to_m; });
-        // Take absolute value of electric field
-        std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::fabs(value); });
-        PoissonSolution solution(anode_voltage, m_x_line, m_solution, m_electron_density, m_hole_density, electric_field_vector);
-        m_list_voltages.push_back(anode_voltage);
-        m_list_poisson_solutions.push_back(solution);
 
-        index_voltage_step++;
-        anode_voltage += voltage_step;
+        } else {
+            m_solver_success = true;
+            // Transform solution into std::vector
+            std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
+            std::vector<double> electric_field_vector = Utils::gradient(m_xline_vector, solution_vector);
+            constexpr double    cm_to_m               = 1.0e-2;
+            std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value *= cm_to_m; });
+            // Take absolute value of electric field
+            std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::fabs(value); });
+            PoissonSolution solution(anode_voltage, m_x_line, m_solution, m_electron_density, m_hole_density, electric_field_vector);
+            m_list_voltages.push_back(anode_voltage);
+            m_list_poisson_solutions.push_back(solution);
+
+            index_voltage_step++;
+            anode_voltage += voltage_step;
+        }
     }
     auto                          end             = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;

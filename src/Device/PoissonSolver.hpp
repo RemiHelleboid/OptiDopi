@@ -60,6 +60,7 @@ class NewtonPoissonSolver {
     Eigen::VectorXd              m_derivative_total_charge;
     std::vector<double>          m_list_voltages;
     std::vector<PoissonSolution> m_list_poisson_solutions;
+    bool                         m_solver_success = false;
 
     mcintyre::McIntyre m_mcintyre_solver;
     bool               m_solve_with_mcintyre   = false;
@@ -94,6 +95,7 @@ class NewtonPoissonSolver {
                                      const int    max_iterations,
                                      double       voltage_step);
 
+    bool                get_solver_success() const { return m_solver_success; }
     double              get_depletion_width(const double epsilon) const;
     std::vector<double> get_list_depletion_width(const double epsilon) const;
 

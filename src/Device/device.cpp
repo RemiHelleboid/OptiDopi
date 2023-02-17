@@ -55,7 +55,6 @@ void device::solve_poisson(const double final_anode_voltage, const double tolera
     m_poisson_solver.set_doping_profile(m_doping_profile);
     const double voltage_step = 0.01;
     m_poisson_solver.newton_solver(final_anode_voltage, tolerance, max_iterations, voltage_step);
-
     m_list_voltages          = m_poisson_solver.get_list_voltages();
     m_list_poisson_solutions = m_poisson_solver.get_list_poisson_solutions();
 }
@@ -204,19 +203,34 @@ double device::get_depletion_at_voltage(double voltage) const {
 }
 
 cost_function_result device::compute_cost_function(double voltage_above_breakdown) const {
-    const double alpha_BV             = 1000.0;
-    const double alpha_BP             = 100.0;
-    const double alpha_DW             = 50.0;
-    double       BV_Target            = 20.0;
-    double       BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
-    double       BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
-    double       DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage + voltage_above_breakdown);
-    double       BV_obj               = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
-    double       BP_obj               = alpha_BP * BreakdownProbability;
-    double       DW_obj               = alpha_DW * DepletionWidth;
-    if (std::isnan(BV_obj)) {
-        BV_obj = -1.0e6;
+    const double alpha_BV                     = 1000.0;
+    const double alpha_BP                     = 100.0;
+    const double alpha_DW                     = 100.0;
+    const double alpha_tot_acceptor           = 50.0;
+    auto         total_acceptor_concentration = m_doping_profile.get_acceptor_concentration();
+    double integral_acceptor_concentration = std::accumulate(total_acceptor_concentration.begin(), total_acceptor_concentration.end(), 0.0);
+    integral_acceptor_concentration /= total_acceptor_concentration.size();
+    double log_acceptor_concentration = std::log10(integral_acceptor_concentration);
+    log_acceptor_concentration        -= 16.0;
+    double total_acceptor_obj         = alpha_tot_acceptor * log_acceptor_concentration;
+    double BV_Target            = 20.0;
+    double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
+    double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
+    double DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage + voltage_above_breakdown);
+    double BV_cost              = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
+    double BP_cost              = -alpha_BP * BreakdownProbability;
+    double meter_to_micron      = 1.0e6;
+    double DW_cost              = -alpha_DW * DepletionWidth * meter_to_micron;
+    if (std::isnan(BV_cost)) {
+        BV_cost = 1.0e6;
     }
-    double cost = BV_obj - BP_obj - DW_obj;
-    return {BV_obj, BP_obj, DW_obj, cost};
+    double cost = BV_cost + BP_cost + DW_cost + total_acceptor_obj;
+    // Print all costs
+    fmt::print("BV cost: {:10.5f} BP cost: {:10.5f} DW cost: {:10.5f} Acceptors cost: {:10.5f} Total cost: {:10.5f}\n",
+               BV_cost,
+               BP_cost,
+               DW_cost,
+               total_acceptor_obj,
+               cost);
+    return {BV_cost, BP_cost, DW_cost, cost};
 }
