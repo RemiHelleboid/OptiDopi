@@ -144,8 +144,8 @@ int main() {
     std::size_t nb_parameters = 2;
     std::size_t nb_particles  = 16;
     double      c1            = 2.0;
-    double      c2            = 2.0;
-    double      w             = 0.8;
+    double      c2            = 1.0e-1;
+    double      w             = 0.95;
 
     Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
