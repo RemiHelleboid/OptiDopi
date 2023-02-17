@@ -83,7 +83,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
     }
     double total_brp = mBreakdownP.norm();
-    if (!mSolverHasConverged || total_brp <= 0.5) {
+    if (!mSolverHasConverged || total_brp <= 0.7) {
         // std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
     }

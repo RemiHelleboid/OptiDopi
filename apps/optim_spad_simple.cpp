@@ -24,14 +24,6 @@ static int idx = 0;
 static std::string filename = "optim_path_full.csv";
 std::ofstream file_path(filename);
 
-
-struct cost_function_result {
-    double BV_cost;
-    double BP_cost;
-    double DW_cost;
-    double total_cost;
-};
-
 struct result_sim {
     double               length_intrinsic;
     double               doping_acceptor;
@@ -58,24 +50,6 @@ struct mapping_cost_function {
     std::vector<std::vector<double>> depletion_width;
     std::vector<std::vector<double>> cost_function;
 };
-
-cost_function_result cost_function_formal(double BreakdownVoltage, double BreakdownProbability, double DepletionWidth) {
-    double       BV_Target = 20.0;
-    const double alpha_BV  = 1000.0;
-    const double alpha_BP  = 100.0;
-    const double alpha_DW  = 50.0;
-    double       BV_cost   = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
-    double       BP_cost   = alpha_BP * BreakdownProbability;
-    double       DW_cost   = alpha_DW * DepletionWidth;
-    if (std::isnan(BV_cost)) {
-        BV_cost = -1.0e6;
-    } else {
-        BV_cost *= -1.0;
-    }
-    double cost = DW_cost + BV_cost + BP_cost;
-    cost *= -1.0;
-    return {BV_cost, BP_cost, DW_cost, cost};
-}
 
 result_sim intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
     std::size_t number_points    = 400;
@@ -123,15 +97,15 @@ result_sim intermediate_cost_function(double length_intrinsic, double log_doping
     // Put the result in the log file
     fmt::print(file_path, "{:.5e},{:.5e},{:.5e}\n", BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
 
-    cost_function_result cost_resultr = cost_function_formal(BV, BrP_at_Biasing, DepletionWidth_at_Biasing);
+    cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
     result_sim           full_result(length_intrinsic, doping_acceptor, BV, BrP_at_Biasing, DepletionWidth_at_Biasing, cost_resultr);
 
     return full_result;
 }
 
 void create_map_cost_function(std::string filename) {
-    int                 Ndop             = 100;
-    int                 Nlen             = 100;
+    int                 Ndop             = 25;
+    int                 Nlen             = 25;
     double              min_doping       = 16;
     double              max_doping       = 19;
     double              min_length       = 0.0;
@@ -198,6 +172,7 @@ double cost_function(std::vector<double> variables) {
 int main() {
     std::cout << "Simulated Annealing for SPAD optimization" << std::endl;
 
+    create_map_cost_function("main_cost_function2.csv");
 
     file_path << "BV,BrP,DW\n";
 
@@ -274,7 +249,6 @@ int main() {
 
 
 
-        // create_map_cost_function("main_cost_function.csv");
 
     double poisson_time  = NewtonPoissonSolver::get_poisson_solver_time();
     double mcintyre_time = mcintyre::McIntyre::get_mcintyre_time();

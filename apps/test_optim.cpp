@@ -16,70 +16,59 @@
 #include <vector>
 
 #include "SimulatedAnneal.hpp"
+#include "ParticleSwarm.hpp"
+
 #include "fmt/format.h"
 #include "fmt/ostream.h"
 #include "fmt/ranges.h"
 
 // Optimize simple square function
 
-double cost_function(std::vector<double> variables) {
-    double sum     = 0;
-    double sum_sq  = 0;
-    double sum_cub = 0;
+double rastrigin_function(std::vector<double> variables) {
+    double sum = 0;
     for (auto variable : variables) {
-        sum += variable;
-        sum_sq += variable * variable;
-        sum_cub += variable * variable * variable;
+        sum += variable * variable - 10 * cos(2 * M_PI * variable);
     }
-    double y_sin = sin(sum);
-    double y_cos = cos(sum_sq);
-    return fabs(sum_sq);
-    }
-
-// Export map of the cost function with fmt
-void export_cost_function() {
-    std::ofstream file("cost_function.csv");
-    for (double x = -10; x < 10; x += 0.1) {
-        file << fmt::format("{},{}\n", x, cost_function({x}));
-    }
-}
-
-// Generate random neighbour
-std::vector<double> neighbour_function(std::vector<double> variables) {
-    std::random_device                     random_device;
-    std::mt19937                           generator(random_device());
-    std::uniform_real_distribution<double> distribution(-1.0, 1.0);
-    std::vector<double>                    new_variables;
-    for (auto variable : variables) {
-        new_variables.push_back(variable + distribution(generator));
-    }
-    return new_variables;
+    return 10 * variables.size() + sum;
 }
 
 int main() {
     // export_cost_function();
 
     // Create simulated annealing object
-    std::size_t        max_iter         = 500;
+    std::size_t        max_iter         = 10000;
     double             initial_temp     = 100;
     double             final_temp       = 1e-6;
-    std::size_t        nb_parameters    = 3;
+    std::size_t        nb_parameters    = 2;
+    double             alpha_cooling    = 0.999;
     CoolingSchedule    cooling_schedule = CoolingSchedule::Geometrical;
-    SimulatedAnnealing sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function);
-    sa.set_alpha_cooling(0.99);
-
-    // Set bounds
-    sa.set_bounds({{-10, 10}, {-10, 10}, {-10, 10}});
-
-    // Create random initial solution
-    // sa.create_random_initial_solution();
-    sa.set_initial_solution({9.0, -7.0, 3.0});
-    // Run simulated annealing
+    SimulatedAnnealing sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, rastrigin_function);
+    sa.set_alpha_cooling(alpha_cooling);
+    sa.set_bounds({{-10, 10}, {-10, 10}});
+    sa.set_initial_solution({8, -9});
     sa.run();
 
     // Print results with fmt
     fmt::print("Best solution: {}\n", sa.get_best_solution());
     fmt::print("Best cost: {}\n", sa.get_best_cost());
+
+
+    // Particle swarm optimization
+    std::size_t     nb_particles = 20;
+    double          c1           = 2;
+    double          c2           = 2;
+    double          w            = 0.9;
+    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, rastrigin_function);
+    pso.set_bounds({{-10, 10}, {-10, 10}});
+    pso.set_cognitive_weight(c1);
+    pso.set_social_weight(c2);
+    pso.set_inertia_weight(w);
+
+    double NbIterations = 1000;
+    pso.optimize(NbIterations);
+
+    fmt::print("Best solution: {}\n", pso.get_best_position());
+    fmt::print("Best cost: {}\n", pso.get_best_fitness());
 
     return 0;
 }

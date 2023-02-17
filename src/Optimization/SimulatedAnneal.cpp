@@ -145,7 +145,7 @@ void SimulatedAnnealing::run() {
         add_current_solution_to_history();
         // Print log with format: iteration, temperature, cost, with fmt::print
         double ratio = (double)nb_iter_with_change / (double)m_current_iteration;
-        if (m_current_iteration % 25 == 0) {
+        if (m_current_iteration % 250 == 0) {
             fmt::print("{}, {:.2e}, {:.5e} Ratio: {:.2f}\n", m_current_iteration, m_temperature, m_current_cost, ratio);
         }
         ++m_current_iteration;

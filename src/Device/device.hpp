@@ -20,6 +20,13 @@
 #include "PoissonSolver.hpp"
 #include "doping_profile.hpp"
 
+struct cost_function_result {
+    double BV_cost;
+    double BP_cost;
+    double DW_cost;
+    double total_cost;
+};
+
 class device {
  private:
     doping_profile m_doping_profile;
@@ -61,6 +68,7 @@ class device {
     void smooth_doping_profile(int window_size);
 
     void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
+    bool get_poisson_success() const { return m_poisson_solver.get_solver_success(); } 
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
 
     const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }
@@ -75,4 +83,6 @@ class device {
 
     double get_brp_at_voltage(double voltage) const;
     double get_depletion_at_voltage(double voltage) const;
+
+    cost_function_result compute_cost_function(double voltage_above_breakdown) const;
 };
