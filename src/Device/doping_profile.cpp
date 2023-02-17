@@ -96,6 +96,7 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     if (list_x_acceptor.back() > xlength) {
         throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
     }
+    std::cout << "Setting up advanced pin diode" << std::endl;
 
     m_x_line = utils::linspace(0.0, xlength, number_points);
     m_donor_concentration.clear();

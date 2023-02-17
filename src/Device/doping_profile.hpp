@@ -53,8 +53,8 @@ class doping_profile {
                              double              length_intrinsic,
                              double              donor_level,
                              double              intrisic_level,
-                             std::vector<double> list_acceptor_level,
-                             std::vector<double> list_acceptor_width);
+                             std::vector<double> list_x_acceptor,
+                             std::vector<double> list_acceptor_level);
 
     void export_doping_profile(const std::string& filename) const;
 };

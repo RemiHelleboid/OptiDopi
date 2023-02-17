@@ -37,16 +37,16 @@ void device::set_up_complex_diode(double              xlength,
                                   double              length_intrinsic,
                                   double              donor_level,
                                   double              intrisic_level,
-                                  std::vector<double> list_acceptor_level,
-                                  std::vector<double> list_acceptor_width) {
+                                  std::vector<double> list_x_acceptor,
+                                  std::vector<double> list_acceptor_level) {
     m_doping_profile.set_up_advanced_pin(xlength,
                                          number_points,
                                          length_donor,
                                          length_intrinsic,
                                          donor_level,
                                          intrisic_level,
-                                         list_acceptor_level,
-                                         list_acceptor_width);
+                                         list_x_acceptor,
+                                         list_acceptor_level);
 }
 
 void device::smooth_doping_profile(int window_size) { m_doping_profile.smooth_doping_profile(window_size); }
@@ -211,8 +211,8 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     double integral_acceptor_concentration = std::accumulate(total_acceptor_concentration.begin(), total_acceptor_concentration.end(), 0.0);
     integral_acceptor_concentration /= total_acceptor_concentration.size();
     double log_acceptor_concentration = std::log10(integral_acceptor_concentration);
-    log_acceptor_concentration        -= 16.0;
-    double total_acceptor_obj         = alpha_tot_acceptor * log_acceptor_concentration;
+    log_acceptor_concentration -= 16.0;
+    double total_acceptor_obj   = alpha_tot_acceptor * log_acceptor_concentration;
     double BV_Target            = 20.0;
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);

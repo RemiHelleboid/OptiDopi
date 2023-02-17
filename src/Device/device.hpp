@@ -25,6 +25,20 @@ struct cost_function_result {
     double BP_cost;
     double DW_cost;
     double total_cost;
+
+    void set_NaN() {
+        BV_cost    = -std::numeric_limits<double>::quiet_NaN();
+        BP_cost    = std::numeric_limits<double>::quiet_NaN();
+        DW_cost    = std::numeric_limits<double>::quiet_NaN();
+        total_cost = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    void set_very_high() {
+        BV_cost    = -1.0e6;
+        BP_cost    = 1.0e6;
+        DW_cost    = 1.0e6;
+        total_cost = 1.0e6;
+    }
 };
 
 class device {
