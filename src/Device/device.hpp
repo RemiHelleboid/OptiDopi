@@ -20,6 +20,13 @@
 #include "PoissonSolver.hpp"
 #include "doping_profile.hpp"
 
+struct cost_function_result {
+    double BV_cost;
+    double BP_cost;
+    double DW_cost;
+    double total_cost;
+};
+
 class device {
  private:
     doping_profile m_doping_profile;
@@ -75,4 +82,6 @@ class device {
 
     double get_brp_at_voltage(double voltage) const;
     double get_depletion_at_voltage(double voltage) const;
+
+    cost_function_result compute_cost_function(double voltage_above_breakdown) const;
 };

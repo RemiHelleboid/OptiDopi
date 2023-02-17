@@ -202,3 +202,21 @@ double device::get_depletion_at_voltage(double voltage) const {
     double interpolated_depletion = Utils::interp1d(m_list_voltages, m_poisson_solver.get_list_depletion_width(epsilon), voltage);
     return interpolated_depletion;
 }
+
+cost_function_result device::compute_cost_function(double voltage_above_breakdown) const {
+    const double alpha_BV             = 1000.0;
+    const double alpha_BP             = 100.0;
+    const double alpha_DW             = 50.0;
+    double       BV_Target            = 20.0;
+    double       BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
+    double       BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
+    double       DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage + voltage_above_breakdown);
+    double       BV_obj               = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
+    double       BP_obj               = alpha_BP * BreakdownProbability;
+    double       DW_obj               = alpha_DW * DepletionWidth;
+    if (std::isnan(BV_obj)) {
+        BV_obj = -1.0e6;
+    }
+    double cost = BV_obj - BP_obj - DW_obj;
+    return {BV_obj, BP_obj, DW_obj, cost};
+}

@@ -305,7 +305,8 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
         }
         if (index_iteration == max_iterations) {
             std::cout << "Maximum number of iterations reached" << std::endl;
-            throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
+            // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
+            
         }
         // Transform solution into std::vector
         std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
