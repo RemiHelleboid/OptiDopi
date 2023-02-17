@@ -56,7 +56,7 @@ class ParticleSwarm {
     std::vector<Particle> m_particles;
     std::vector<double>   m_bounds_min;
     std::vector<double>   m_bounds_max;
-    double                m_velocity_scaling = 1.0;
+    double                m_velocity_scaling = 1.0e-1;
 
     std::vector<double> m_best_position;
     double              m_best_fitness;
