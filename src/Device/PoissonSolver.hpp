@@ -62,9 +62,11 @@ class NewtonPoissonSolver {
     std::vector<PoissonSolution> m_list_poisson_solutions;
     bool                         m_solver_success = false;
 
-    mcintyre::McIntyre m_mcintyre_solver;
-    bool               m_solve_with_mcintyre   = false;
-    double             m_step_voltage_mcintyre = 0.0;
+    mcintyre::McIntyre                      m_mcintyre_solver;
+    std::vector<double>                     m_list_mcintyre_voltages;
+    std::vector<mcintyre::McIntyreSolution> m_list_mcintyre_solutions;
+    bool                                    m_solve_with_mcintyre   = false;
+    double                                  m_step_voltage_mcintyre = 0.0;
 
     static double m_poisson_solver_time;
 
@@ -93,7 +95,10 @@ class NewtonPoissonSolver {
     void newton_solver_with_mcintyre(const double final_anode_voltage,
                                      const double tolerance,
                                      const int    max_iterations,
-                                     double       voltage_step);
+                                     double       voltage_step,
+                                     const double step_voltage_mcintyre,
+                                     bool         stop_at_bvPlus = false,
+                                     double       bvPlus         = 3.0);
 
     bool                get_solver_success() const { return m_solver_success; }
     double              get_depletion_width(const double epsilon) const;
@@ -102,6 +107,9 @@ class NewtonPoissonSolver {
     std::vector<double>          get_list_voltages() const { return m_list_voltages; }
     std::vector<PoissonSolution> get_list_poisson_solutions() const { return m_list_poisson_solutions; }
     void                         export_current_solution(const std::string& filename) const;
+
+    std::vector<double>                     get_list_mcintyre_voltages() const { return m_list_mcintyre_voltages; }
+    std::vector<mcintyre::McIntyreSolution> get_list_mcintyre_solutions() const { return m_list_mcintyre_solutions; }
 
     void reset_all();
 };

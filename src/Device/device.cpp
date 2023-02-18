@@ -98,6 +98,28 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     }
 }
 
+void device::solve_poisson_and_mcintyre(const double final_anode_voltage,
+                                        const double tolerance,
+                                        const int    max_iterations,
+                                        double       mcintyre_voltage_step,
+                                        double       stop_at_bv_plus) {
+    m_poisson_solver.set_doping_profile(m_doping_profile);
+    const double voltage_step = 0.01;
+
+    m_poisson_solver.newton_solver_with_mcintyre(final_anode_voltage,
+                                                 tolerance,
+                                                 max_iterations,
+                                                 voltage_step,
+                                                 mcintyre_voltage_step,
+                                                 true,
+                                                 stop_at_bv_plus);
+    m_list_voltages          = m_poisson_solver.get_list_voltages();
+    m_list_poisson_solutions = m_poisson_solver.get_list_poisson_solutions();
+
+    m_list_mcintyre_voltages  = m_poisson_solver.get_list_mcintyre_voltages();
+    m_list_mcintyre_solutions = m_poisson_solver.get_list_mcintyre_solutions();
+}
+
 void device::export_depletion_width(const std::string& directory_name, const std::string& prefix) const {
     const double        epsilon                          = 1e-9;
     std::vector<double> list_total_breakdown_probability = m_poisson_solver.get_list_depletion_width(epsilon);

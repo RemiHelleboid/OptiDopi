@@ -336,6 +336,125 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     m_poisson_solver_time += elapsed_seconds.count();
 }
 
+/**
+ * @brief Solve the Poisson equation using the Newton-Raphson method for the electrostatic potential,
+ * together with the Mcintyre method for the electron and hole avalanche breakdown probability.
+ *
+ * @param final_anode_voltage
+ * @param tolerance
+ * @param max_iterations
+ * @param voltage_step
+ * @param step_voltage_mcintyre
+ * @param stop_at_bvPlus
+ * @param bvPlus
+ */
+void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_voltage,
+                                                      const double tolerance,
+                                                      const int    max_iterations,
+                                                      double       voltage_step,
+                                                      const double step_voltage_mcintyre,
+                                                      bool         stop_at_bvPlus,
+                                                      double       bvPlus) {
+    auto start = std::chrono::high_resolution_clock::now();
+
+    double       anode_voltage   = 0.0;
+    const double cathode_voltage = 0.0;
+    const double doping_anode    = m_doping_concentration(0);
+    const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
+    voltage_step                 = 3.0 * m_thermal_voltage;
+    // fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
+
+    // McIntyre setup
+    int freq_step_mcintyre = int(voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
+    if (freq_step_mcintyre < 1) {
+        freq_step_mcintyre = 1;
+    }
+    std::vector<double> x_line_micron(m_doping_concentration.data(), m_doping_concentration.data() + m_doping_concentration.size());
+    m_mcintyre_solver.set_xline(x_line_micron);
+    double tol               = 1e-6;
+    double breakdown_voltage = 0.0;
+    double cm_to_micron      = 1.0e-4;
+    std::cout << "X max: " << x_line_micron.back() << std::endl;
+
+    std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
+    compute_initial_guess();
+    compute_total_charge(cathode_voltage, anode_voltage);
+    compute_derivative_total_charge(cathode_voltage, anode_voltage);
+    compute_matrix();
+    update_matrix();
+    compute_right_hand_side();
+
+    m_solver.analyzePattern(m_matrix);
+
+    Eigen::VectorXd m_new_solution(m_x_line.size());
+    const double    lambda = 1.0;
+
+    std::size_t index_voltage_step = 0;
+    while (anode_voltage <= final_anode_voltage) {
+        // std::cout << "\rVoltage anode: " << anode_voltage << std::flush;
+        double      residual        = 1.0e10;
+        std::size_t index_iteration = 0;
+        while (residual > tolerance && index_iteration < max_iterations) {
+            index_iteration++;
+            compute_total_charge(cathode_voltage, anode_voltage);
+            compute_derivative_total_charge(cathode_voltage, anode_voltage);
+            update_matrix();
+            compute_right_hand_side();
+            m_solver.factorize(m_matrix);
+            if (m_solver.info() != Eigen::Success) {
+                std::cerr << "Factorization failed. Poisson failed." << std::endl;
+                m_solver_success = false;
+                return;
+            }
+            m_new_solution = m_solver.solve(m_vector_rhs);
+            residual       = m_new_solution.norm();
+            m_solution += lambda * m_new_solution;
+            m_solution(0)                   = compute_boundary_conditions(anode_voltage, doping_anode);
+            m_solution(m_x_line.size() - 1) = compute_boundary_conditions(cathode_voltage, doping_cathode);
+        }
+        if (index_iteration == max_iterations) {
+            std::cerr << "Maximum number of iterations reached. Poisson failed." << std::endl;
+            m_solver_success = false;
+            return;
+            // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
+
+        } else {
+            m_solver_success = true;
+            // Transform solution into std::vector
+            std::vector<double> solution_vector(m_solution.data(), m_solution.data() + m_solution.size());
+            std::vector<double> electric_field_vector = Utils::gradient(m_xline_vector, solution_vector);
+            constexpr double    cm_to_m               = 1.0e-2;
+            std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value *= cm_to_m; });
+            // Take absolute value of electric field
+            std::for_each(electric_field_vector.begin(), electric_field_vector.end(), [](double& value) { value = std::fabs(value); });
+            PoissonSolution solution(anode_voltage, m_x_line, m_solution, m_electron_density, m_hole_density, electric_field_vector);
+            m_list_voltages.push_back(anode_voltage);
+            m_list_poisson_solutions.push_back(solution);
+
+            index_voltage_step++;
+            anode_voltage += voltage_step;
+
+            // McIntyre
+            if (index_voltage_step % freq_step_mcintyre == 0) {
+                m_mcintyre_solver.set_electric_field(electric_field_vector, false, cm_to_micron);
+                m_mcintyre_solver.ComputeDampedNewtonSolution(tol);
+                m_list_mcintyre_voltages.push_back(anode_voltage);
+                m_list_mcintyre_solutions.push_back(m_mcintyre_solver.get_solution());
+                if (m_list_mcintyre_solutions.back().m_mean_breakdown_probability > 1e-3 && breakdown_voltage == 0.0) {
+                    breakdown_voltage = anode_voltage;
+                    if (stop_at_bvPlus && anode_voltage > breakdown_voltage + bvPlus) {
+                        fmt::print("Poison solver stopped :) BV+ = {}\n", breakdown_voltage + bvPlus);
+                        break;
+                    }
+                }
+            }
+        }
+        auto                          end             = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed_seconds = end - start;
+        m_poisson_solver_time += elapsed_seconds.count();
+    }
+}
+
 double NewtonPoissonSolver::get_depletion_width(const double epsilon) const {
     return compute_depletion_width(m_x_line, m_electron_density, m_hole_density, m_doping_concentration, epsilon);
 }

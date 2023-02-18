@@ -22,10 +22,12 @@
 
 namespace Optimization {
 
-ParticleSwarm::ParticleSwarm(std::size_t                                       number_particles,
+ParticleSwarm::ParticleSwarm(std::size_t                                       max_iterations,
+                             std::size_t                                       number_particles,
                              std::size_t                                       number_dimensions,
                              std::function<double(const std::vector<double>&)> fitness_function)
-    : m_number_particles(number_particles),
+    : m_max_iterations(max_iterations),
+      m_number_particles(number_particles),
       m_number_dimensions(number_dimensions),
       m_fitness_function(fitness_function) {
     m_particles.resize(m_number_particles);
@@ -93,17 +95,22 @@ void ParticleSwarm::clip_particles() {
     }
 }
 
-void        ParticleSwarm::update_particles() {
+void ParticleSwarm::update_particles() {
+    double current_cognitive_weight = m_cognitive_weight;
+    if (m_cognitive_learning_scheme == LearningScheme::Linear) {
+        current_cognitive_weight = m_cognitive_weight * (1.0 - (m_current_iteration / static_cast<double>(m_max_iterations)));
+    }
 #pragma omp parallel for schedule(static)
     for (auto& particle : m_particles) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
             double r1            = m_uniform_distribution(m_random_engine);
             double r2            = m_uniform_distribution(m_random_engine);
             particle.velocity[i] = m_inertia_weight * particle.velocity[i] +
-                                   m_cognitive_weight * r1 * (particle.best_position[i] - particle.position[i]) +
+                                   current_cognitive_weight * r1 * (particle.best_position[i] - particle.position[i]) +
                                    m_social_weight * r2 * (m_best_position[i] - particle.position[i]);
             particle.position[i] += particle.velocity[i] * m_velocity_scaling;
         }
+        this->clip_particles();
         double fitness = m_fitness_function(particle.position);
         if (fitness < particle.best_fitness) {
             particle.best_position = particle.position;
@@ -134,19 +141,19 @@ double ParticleSwarm::compute_mean_distance() const {
     return mean_distance;
 }
 
-void ParticleSwarm::optimize(std::size_t number_iterations) {
+void ParticleSwarm::optimize() {
     initialize_particles();
-    for (std::size_t i = 0; i < number_iterations; ++i) {
-        m_current_iteration = i;
+    while (m_current_iteration <= m_max_iterations) {
         update_particles();
-        clip_particles();
+        m_current_iteration++;
         this->export_current_state();
         double mean_distance = compute_mean_distance();
         std::cout << fmt::format("\rIteration {:d}/{:d} -> Best fitness: {:.3f} (mean distance: {:.3f})",
                                  m_current_iteration,
-                                 number_iterations,
+                                 m_max_iterations,
                                  m_best_fitness,
-                                 mean_distance) << std::flush;
+                                 mean_distance)
+                  << std::flush;
     }
 
     std::cout << std::endl;

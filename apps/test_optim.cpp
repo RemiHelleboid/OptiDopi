@@ -54,18 +54,17 @@ int main() {
 
 
     // Particle swarm optimization
+    double NbIterations = 1000;
     std::size_t     nb_particles = 20;
     double          c1           = 2;
     double          c2           = 2;
     double          w            = 0.9;
-    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, rastrigin_function);
+    Optimization::ParticleSwarm pso(NbIterations, nb_particles, nb_parameters, rastrigin_function);
     pso.set_bounds({{-10, 10}, {-10, 10}});
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
     pso.set_inertia_weight(w);
 
-    double NbIterations = 1000;
-    pso.optimize(NbIterations);
 
     fmt::print("Best solution: {}\n", pso.get_best_position());
     fmt::print("Best cost: {}\n", pso.get_best_fitness());

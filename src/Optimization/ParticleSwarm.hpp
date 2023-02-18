@@ -54,7 +54,6 @@ enum class LearningScheme { Constant, Linear, Geometrical };
 
 class ParticleSwarm {
  private:
-    std::size_t           m_current_iteration = 0;
     std::vector<Particle> m_particles;
     std::vector<double>   m_bounds_min;
     std::vector<double>   m_bounds_max;
@@ -65,6 +64,10 @@ class ParticleSwarm {
 
     std::size_t m_number_particles;
     std::size_t m_number_dimensions;
+    std::size_t m_max_iterations;
+
+    std::size_t m_current_iteration = 0;
+    std::size_t m_number_iterations_without_improvement;
 
     double m_inertia_weight;
     double m_cognitive_weight;
@@ -83,7 +86,8 @@ class ParticleSwarm {
     std::string                      m_dir_export = "ParticleSwarmResults/";
 
  public:
-    ParticleSwarm(std::size_t                                       number_particles,
+    ParticleSwarm(std::size_t                                       max_iterations,
+                  std::size_t                                       number_particles,
                   std::size_t                                       number_dimensions,
                   std::function<double(const std::vector<double>&)> fitness_function);
     ~ParticleSwarm() = default;
@@ -96,12 +100,15 @@ class ParticleSwarm {
     void set_bounds(const std::vector<double>& bounds_min, const std::vector<double>& bounds_max);
     void set_bounds(std::vector<std::pair<double, double>> bounds);
 
+    void set_cognitive_learning_scheme(LearningScheme learning_scheme) { m_cognitive_learning_scheme = learning_scheme; }
+    void set_social_learning_scheme(LearningScheme learning_scheme) { m_social_learning_scheme = learning_scheme; }
+
     void   initialize_particles();
     void   update_particles();
     void   clip_particles();
     double compute_mean_distance() const;
 
-    void optimize(std::size_t number_iterations);
+    void optimize();
 
     std::vector<double>                     get_best_position() const { return m_best_position; }
     double                                  get_best_fitness() const { return m_best_fitness; }

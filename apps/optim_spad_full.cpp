@@ -139,18 +139,19 @@ int main(int argc, const char** argv) {
     std::cout << "Number particles: " << nb_particles << std::endl;
     std::size_t max_iter         = 100;
     std::size_t nb_parameters    = N_X;
-    double      c1               = 2.0;
+    double      c1               = 5.0;
     double      c2               = 1.0;
     double      w                = 0.9;
-    double      velocity_scaling = 0.1;
+    double      velocity_scaling = 0.5;
 
-    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
     pso.set_inertia_weight(w);
     pso.set_velocity_scaling(velocity_scaling);
-    pso.optimize(max_iter);
+    pso.set_cognitive_learning_scheme(Optimization::LearningScheme::Linear);
+    pso.optimize();
 
 
     auto best_path = pso.get_history_best_position();
