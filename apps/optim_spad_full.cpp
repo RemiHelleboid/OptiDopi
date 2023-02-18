@@ -30,7 +30,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     std::filesystem::create_directories(dirname);
 
     double              x_length        = 10.0;
-    std::size_t         nb_points       = 250;
+    std::size_t         nb_points       = 500;
     double              donor_length    = 1.0;
     double              intrisic_length = 0.0;
     double              donor_level     = 5.0e19;
@@ -57,7 +57,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
     double      x_length        = 10.0;
-    std::size_t nb_points       = 200;
+    std::size_t nb_points       = 500;
     double      donor_length    = 1.0;
     double      intrisic_length = 0.0;
 
