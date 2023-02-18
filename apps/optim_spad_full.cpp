@@ -49,10 +49,10 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     my_device
         .set_up_complex_diode(x_length, nb_points, donor_length, intrisic_length, donor_level, intrisic_level, acceptor_x, acceptor_levels);
     my_device.smooth_doping_profile(10);
-    int         thread_num = omp_get_thread_num();
-    std::string file_name  = fmt::format("REES/doping_profile_{}_{}.txt", thread_num, IDX_ITER);
-    IDX_ITER++;
-    my_device.export_doping_profile(file_name);
+    // int         thread_num = omp_get_thread_num();
+    // std::string file_name  = fmt::format("REES/doping_profile_{}_{}.txt", thread_num, IDX_ITER);
+    // IDX_ITER++;
+    // my_device.export_doping_profile(file_name);
     double    target_anode_voltage = 40.0;
     double    tol                  = 1.0e-6;
     const int max_iter             = 100;
