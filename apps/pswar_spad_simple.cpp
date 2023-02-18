@@ -15,6 +15,7 @@
 #include "doping_profile.hpp"
 #include "fill_vector.hpp"
 #include "omp.h"
+#include "OptimStruct.hpp"
 
 // Set number of threads
 
@@ -24,24 +25,6 @@ static int idx = 0;
 // Static file for log
 static std::string filename = "ps_optim_path_full.csv";
 std::ofstream      file_path(filename);
-
-struct result_sim {
-    double               length_intrinsic;
-    double               doping_acceptor;
-    double               BV;
-    double               BrP;
-    double               DW;
-    cost_function_result cost_result;
-
-    result_sim(double length_intrinsic, double doping_acceptor, double BV, double BrP, double DW, cost_function_result cost) {
-        this->length_intrinsic = length_intrinsic;
-        this->doping_acceptor  = doping_acceptor;
-        this->BV               = BV;
-        this->BrP              = BrP;
-        this->DW               = DW;
-        this->cost_result      = cost;
-    }
-};
 
 result_sim intermediate_cost_function(double length_intrinsic, double log_doping_acceptor, int thread_id = 0) {
     std::size_t number_points    = 400;
@@ -119,9 +102,6 @@ int main() {
     std::cout << "Particle Swarm Optimization" << std::endl;
     // Set number of threads
 
-
-    file_path << "BV,BrP,DW\n";
-
     std::string DIR_RES = "results_pso";
     if (!std::filesystem::exists(DIR_RES)) {
         std::filesystem::create_directory(DIR_RES);
@@ -129,8 +109,6 @@ int main() {
         std::filesystem::remove_all(DIR_RES);
         std::filesystem::create_directory(DIR_RES);
     }
-
-    // Create simulated annealing object
 
     double min_doping = 1.0e16;
     double max_doping = 1.0e19;
