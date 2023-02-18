@@ -100,9 +100,9 @@ int main(int argc, const char** argv) {
     std::vector<double> min_values = {log10(min_doping), log10(min_doping), log10(min_doping), log10(min_doping), log10(min_doping)};
     std::vector<double> max_values = {log10(max_doping), log10(max_doping), log10(max_doping), log10(max_doping), log10(max_doping)};
 
-    std::size_t max_iter      = 400;
+    std::size_t max_iter      = 200;
     std::size_t nb_parameters = 5;
-    std::size_t nb_particles  = 50;
+    std::size_t nb_particles  = 32;
     double      c1            = 3.0;
     double      c2            = 0.5;
     double      w             = 0.95;
