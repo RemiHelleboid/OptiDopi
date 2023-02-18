@@ -21,3 +21,8 @@ target_link_libraries(test_interp fmt::fmt OpenMP::OpenMP_CXX)
 add_executable(pswar_spad_simple pswar_spad_simple.cpp)
 target_link_libraries(pswar_spad_simple libdevice libutils liboptim)
 target_link_libraries(pswar_spad_simple fmt::fmt OpenMP::OpenMP_CXX)
+
+
+add_executable(spad_cost_function spad_cost_function.cpp)
+target_link_libraries(spad_cost_function libdevice libutils liboptim)
+target_link_libraries(spad_cost_function fmt::fmt OpenMP::OpenMP_CXX)

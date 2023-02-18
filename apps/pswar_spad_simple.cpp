@@ -142,10 +142,15 @@ int main() {
 
     std::size_t max_iter      = 200;
     std::size_t nb_parameters = 2;
-    std::size_t nb_particles  = 16;
     double      c1            = 2.0;
-    double      c2            = 1.0e-1;
+    double      c2            = 0.5;
     double      w             = 0.95;
+    std::size_t nb_particles  = 1;
+#pragma omp parallel
+    {
+        nb_particles  = omp_get_num_threads();
+    }
+    std::cout << "Number particles: " << nb_particles << std::endl;
 
     Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
