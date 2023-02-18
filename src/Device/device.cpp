@@ -226,11 +226,11 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     }
     double cost = BV_cost + BP_cost + DW_cost + total_acceptor_obj;
     // Print all costs
-    fmt::print("BV cost: {:10.5f} BP cost: {:10.5f} DW cost: {:10.5f} Acceptors cost: {:10.5f} Total cost: {:10.5f}\n",
-               BV_cost,
-               BP_cost,
-               DW_cost,
-               total_acceptor_obj,
-               cost);
+    // fmt::print("BV cost: {:10.5f} BP cost: {:10.5f} DW cost: {:10.5f} Acceptors cost: {:10.5f} Total cost: {:10.5f}\n",
+    //            BV_cost,
+    //            BP_cost,
+    //            DW_cost,
+    //            total_acceptor_obj,
+    //            cost);
     return {BV_cost, BP_cost, DW_cost, cost};
 }
