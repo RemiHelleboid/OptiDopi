@@ -26,6 +26,30 @@ static int IDX_ITER = 0;
 
 #define N_X 11
 
+void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
+
+    std::filesystem::create_directories(dirname);
+
+    double      x_length        = 10.0;
+    std::size_t nb_points       = 500;
+    double      donor_length    = 1.0;
+    double      intrisic_length = 0.0;
+    double donor_level    = 5.0e19;
+    double intrisic_level = 1.0e13;
+    std::vector<double> acceptor_x = {1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0};
+
+    for (std::size_t i = 0; i < best_path.size(); ++i) {
+        std::vector<double> acceptor_levels(best_path[i].size());
+        std::transform(best_path[i].begin(), best_path[i].end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
+        device my_device;
+        my_device
+            .set_up_complex_diode(x_length, nb_points, donor_length, intrisic_length, donor_level, intrisic_level, acceptor_x, acceptor_levels);
+        my_device.smooth_doping_profile(5);
+        my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+    }
+
+}
+
 double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
     double      x_length        = 10.0;
@@ -109,22 +133,26 @@ int main(int argc, const char** argv) {
     // fmt print
     fmt::print("x_acceptors: {}\n", x_acceptors);
 
-    std::size_t nb_particles     = 1;
+    std::size_t nb_particles = 1;
 #pragma omp parallel
     { nb_particles = omp_get_num_threads(); }
     std::cout << "Number particles: " << nb_particles << std::endl;
-    std::size_t max_iter         = 500;
+    std::size_t max_iter         = 100;
     std::size_t nb_parameters    = N_X;
     double      c1               = 2.0;
     double      c2               = 1.0;
     double      w                = 0.9;
     double      velocity_scaling = 0.1;
 
-    Optimization::ParticleSwarm pso(2 * nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
     pso.set_inertia_weight(w);
     pso.set_velocity_scaling(velocity_scaling);
     pso.optimize(max_iter);
+
+
+    auto best_path = pso.get_history_best_position();
+    export_best_path(best_path, fmt::format("{}/BEST/", DIR_RES));
 }

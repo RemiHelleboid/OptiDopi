@@ -50,6 +50,8 @@ struct Particle {
     std::mt19937& get_random_engine() { return m_random_engine; }
 };
 
+enum class LearningScheme { Constant, Linear, Geometrical };
+
 class ParticleSwarm {
  private:
     std::size_t           m_current_iteration = 0;
@@ -68,13 +70,17 @@ class ParticleSwarm {
     double m_cognitive_weight;
     double m_social_weight;
 
+    LearningScheme m_cognitive_learning_scheme;
+    LearningScheme m_social_learning_scheme;
+
     std::function<double(const std::vector<double>&)> m_fitness_function;
 
     std::random_device                     m_random_device;
     std::mt19937                           m_random_engine;
     std::uniform_real_distribution<double> m_uniform_distribution;
 
-    std::string m_dir_export = "ParticleSwarmResults/";
+    std::vector<std::vector<double>> m_history_best_position;
+    std::string                      m_dir_export = "ParticleSwarmResults/";
 
  public:
     ParticleSwarm(std::size_t                                       number_particles,
@@ -90,16 +96,16 @@ class ParticleSwarm {
     void set_bounds(const std::vector<double>& bounds_min, const std::vector<double>& bounds_max);
     void set_bounds(std::vector<std::pair<double, double>> bounds);
 
-    void initialize_particles();
-    void update_particles();
-    void clip_particles();
+    void   initialize_particles();
+    void   update_particles();
+    void   clip_particles();
     double compute_mean_distance() const;
 
- 
     void optimize(std::size_t number_iterations);
 
-    std::vector<double> get_best_position() const { return m_best_position; }
-    double              get_best_fitness() const { return m_best_fitness; }
+    std::vector<double>                     get_best_position() const { return m_best_position; }
+    double                                  get_best_fitness() const { return m_best_fitness; }
+    const std::vector<std::vector<double>>& get_history_best_position() const { return m_history_best_position; }
 
     void set_file_export(const std::string& dir_name) { m_dir_export = dir_name; }
 

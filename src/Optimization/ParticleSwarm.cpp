@@ -77,6 +77,7 @@ void ParticleSwarm::initialize_particles() {
             m_best_fitness  = m_particles[i].best_fitness;
         }
     }
+    this->clip_particles();
     this->export_current_state();
 }
 
@@ -115,6 +116,7 @@ void        ParticleSwarm::update_particles() {
             m_best_fitness  = m_particles[i].best_fitness;
         }
     }
+    m_history_best_position.push_back(m_best_position);
 }
 
 double ParticleSwarm::compute_mean_distance() const {
