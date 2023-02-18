@@ -11,14 +11,14 @@
 
 #include "ParticleSwarm.hpp"
 
-#include <fstream>
-#include <iostream>
-#include <filesystem>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-#include "omp.h"
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
+#include "omp.h"
 
 namespace Optimization {
 
@@ -55,13 +55,15 @@ void ParticleSwarm::set_bounds(std::vector<std::pair<double, double>> bounds) {
 
 void ParticleSwarm::initialize_particles() {
     std::cout << "Initializing particles..." << std::endl;
-#pragma omp parallel for 
+#pragma omp parallel for
     for (std::size_t idx_particle = 0; idx_particle < m_number_particles; ++idx_particle) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
             double range = m_bounds_max[i] - m_bounds_min[i];
-            m_particles[idx_particle].position[i] = m_bounds_min[i] + range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
+            m_particles[idx_particle].position[i] =
+                m_bounds_min[i] + range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
             // Velocity is initialized between -abs(max - min) and abs(max - min)
-            m_particles[idx_particle].velocity[i] = -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
+            m_particles[idx_particle].velocity[i] =
+                -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
         }
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
         m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
@@ -90,13 +92,14 @@ void ParticleSwarm::clip_particles() {
     }
 }
 
-void ParticleSwarm::update_particles() {
-#pragma omp parallel for 
+void        ParticleSwarm::update_particles() {
+#pragma omp parallel for schedule(static)
     for (auto& particle : m_particles) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
-            double r1 = m_uniform_distribution(m_random_engine);
-            double r2 = m_uniform_distribution(m_random_engine);
-            particle.velocity[i] = m_inertia_weight * particle.velocity[i] + m_cognitive_weight * r1 * (particle.best_position[i] - particle.position[i]) +
+            double r1            = m_uniform_distribution(m_random_engine);
+            double r2            = m_uniform_distribution(m_random_engine);
+            particle.velocity[i] = m_inertia_weight * particle.velocity[i] +
+                                   m_cognitive_weight * r1 * (particle.best_position[i] - particle.position[i]) +
                                    m_social_weight * r2 * (m_best_position[i] - particle.position[i]);
             particle.position[i] += particle.velocity[i] * m_velocity_scaling;
         }
@@ -114,16 +117,42 @@ void ParticleSwarm::update_particles() {
     }
 }
 
+double ParticleSwarm::compute_mean_distance() const {
+    double mean_distance = 0.0;
+    for (std::size_t i = 0; i < m_number_particles; ++i) {
+        for (std::size_t j = i + 1; j < m_number_particles; ++j) {
+            double distance = 0.0;
+            for (std::size_t k = 0; k < m_number_dimensions; ++k) {
+                distance += std::pow(m_particles[i].position[k] - m_particles[j].position[k], 2.0);
+            }
+            mean_distance += std::sqrt(distance);
+        }
+    }
+    mean_distance /= (m_number_particles * (m_number_particles - 1) / 2.0);
+    return mean_distance;
+}
+
 void ParticleSwarm::optimize(std::size_t number_iterations) {
     initialize_particles();
     for (std::size_t i = 0; i < number_iterations; ++i) {
-        std::cout << fmt::format("Iteration {:d}/{:d}", i, number_iterations) << std::endl;
         m_current_iteration = i;
         update_particles();
         clip_particles();
         this->export_current_state();
-        std::cout << fmt::format("\rIteration {:d}/{:d} -> Best fitness: {:.3f}", i, number_iterations, m_best_fitness) << std::flush;
+        double mean_distance = compute_mean_distance();
+        std::cout << fmt::format("\rIteration {:d}/{:d} -> Best fitness: {:.3f} (mean distance: {:.3f})",
+                                 m_current_iteration,
+                                 number_iterations,
+                                 m_best_fitness,
+                                 mean_distance) << std::flush;
     }
+
+    std::cout << std::endl;
+    fmt::print("Best fitness: {:.3f} at position: ", m_best_fitness);
+    for (std::size_t i = 0; i < m_number_dimensions; ++i) {
+        fmt::print("{:.3f} ", m_best_position[i]);
+    }
+    std::cout << std::endl;
 }
 
 void ParticleSwarm::set_up_export() {
@@ -133,7 +162,7 @@ void ParticleSwarm::set_up_export() {
         std::filesystem::remove_all(m_dir_export);
     }
     std::filesystem::create_directories(m_dir_export);
-    
+
     int dimension = m_number_dimensions;
     // Create one file for each particle to store its history
     for (std::size_t idx_particle = 0; idx_particle < m_number_particles; ++idx_particle) {
@@ -194,6 +223,5 @@ void ParticleSwarm::export_current_state() {
     file << fmt::format(",{:.6f}", m_best_fitness) << std::endl;
     file.close();
 }
-
 
 }  // namespace Optimization

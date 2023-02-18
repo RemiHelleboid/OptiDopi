@@ -298,7 +298,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
             if (m_solver.info() != Eigen::Success) {
-                std::cout << "Factorization failed. Poisson failed." << std::endl;
+                std::cerr << "Factorization failed. Poisson failed." << std::endl;
                 m_solver_success = false;
                 return;
             }
@@ -309,7 +309,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
             m_solution(m_x_line.size() - 1) = compute_boundary_conditions(cathode_voltage, doping_cathode);
         }
         if (index_iteration == max_iterations) {
-            std::cout << "Maximum number of iterations reached. Poisson failed." << std::endl;
+            std::cerr << "Maximum number of iterations reached. Poisson failed." << std::endl;
             m_solver_success = false;
             return;
             // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");

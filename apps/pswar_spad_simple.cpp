@@ -130,7 +130,7 @@ int main() {
     }
     std::cout << "Number particles: " << nb_particles << std::endl;
 
-    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(nb_particles*4, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);

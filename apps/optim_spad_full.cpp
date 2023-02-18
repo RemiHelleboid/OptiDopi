@@ -22,6 +22,9 @@
 #define NAN_DOUBLE std::numeric_limits<double>::quiet_NaN()
 #define BIG_DOUBLE 1.0e10
 
+static int IDX_ITER = 0;
+
+#define N_X 6
 
 double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
@@ -33,7 +36,7 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     double donor_level    = 5.0e19;
     double intrisic_level = 1.0e13;
 
-    std::vector<double> acceptor_x = {1.0, 2.0, 3.0, 5.0, 10.0};
+    std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
     // Take the power 10 of the acceptor levels
     std::transform(log_acceptor_levels.begin(), log_acceptor_levels.end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
@@ -46,10 +49,10 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     my_device
         .set_up_complex_diode(x_length, nb_points, donor_length, intrisic_length, donor_level, intrisic_level, acceptor_x, acceptor_levels);
     my_device.smooth_doping_profile(10);
-    // int         thread_num = omp_get_thread_num();
-    // auto files_list = std::filesystem::directory_iterator("doping_profile");
-    // my_device.export_doping_profile(filename);
-
+    int         thread_num = omp_get_thread_num();
+    std::string file_name  = fmt::format("REES/doping_profile_{}_{}.txt", thread_num, IDX_ITER);
+    IDX_ITER++;
+    my_device.export_doping_profile(file_name);
     double    target_anode_voltage = 40.0;
     double    tol                  = 1.0e-6;
     const int max_iter             = 100;
@@ -58,7 +61,7 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
 
     bool poisson_success = my_device.get_poisson_success();
     if (!poisson_success) {
-        fmt::print("Poisson failed\n");
+        // fmt::print("Poisson failed\n");
         return BIG_DOUBLE;
     }
 
@@ -97,27 +100,29 @@ int main(int argc, const char** argv) {
     double min_doping = 1.0e15;
     double max_doping = 1.0e19;
 
-    std::vector<double> min_values = {log10(min_doping), log10(min_doping), log10(min_doping), log10(min_doping), log10(min_doping)};
-    std::vector<double> max_values = {log10(max_doping), log10(max_doping), log10(max_doping), log10(max_doping), log10(max_doping)};
+    std::vector<double> min_values(N_X, log10(min_doping));
+    std::vector<double> max_values(N_X, log10(max_doping));
 
-    std::size_t max_iter      = 200;
-    std::size_t nb_parameters = 5;
-    double      c1            = 3.0;
-    double      c2            = 0.5;
-    double      w             = 0.95;
-        std::size_t nb_particles  = 1;
+    std::vector<double> x_acceptors = utils::linspace(1.0, 10.0, N_X);
+    // fmt print
+    fmt::print("x_acceptors: {}\n", x_acceptors);
+
+    std::size_t nb_particles     = 1;
 #pragma omp parallel
-    {
-        nb_particles  = omp_get_num_threads();
-    }
+    { nb_particles = omp_get_num_threads(); }
     std::cout << "Number particles: " << nb_particles << std::endl;
+    std::size_t max_iter         = 200;
+    std::size_t nb_parameters    = N_X;
+    double      c1               = 2.0;
+    double      c2               = 0.2;
+    double      w                = 0.95;
+    double      velocity_scaling = 0.1;
 
-
-    Optimization::ParticleSwarm pso(nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(1 * nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
     pso.set_inertia_weight(w);
-
+    pso.set_velocity_scaling(velocity_scaling);
     pso.optimize(max_iter);
 }

@@ -56,7 +56,7 @@ class ParticleSwarm {
     std::vector<Particle> m_particles;
     std::vector<double>   m_bounds_min;
     std::vector<double>   m_bounds_max;
-    double                m_velocity_scaling = 0.25e-1;
+    double                m_velocity_scaling = 1.0;
 
     std::vector<double> m_best_position;
     double              m_best_fitness;
@@ -85,6 +85,7 @@ class ParticleSwarm {
     void set_inertia_weight(double inertia_weight) { m_inertia_weight = inertia_weight; }
     void set_cognitive_weight(double cognitive_weight) { m_cognitive_weight = cognitive_weight; }
     void set_social_weight(double social_weight) { m_social_weight = social_weight; }
+    void set_velocity_scaling(double velocity_scaling) { m_velocity_scaling = velocity_scaling; }
 
     void set_bounds(const std::vector<double>& bounds_min, const std::vector<double>& bounds_max);
     void set_bounds(std::vector<std::pair<double, double>> bounds);
@@ -92,7 +93,9 @@ class ParticleSwarm {
     void initialize_particles();
     void update_particles();
     void clip_particles();
+    double compute_mean_distance() const;
 
+ 
     void optimize(std::size_t number_iterations);
 
     std::vector<double> get_best_position() const { return m_best_position; }
