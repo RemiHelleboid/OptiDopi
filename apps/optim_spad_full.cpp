@@ -37,7 +37,7 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     double intrisic_level = 1.0e13;
 
     // std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
-    std::vector<double> acceptor_x = {[1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0]};
+    std::vector<double> acceptor_x = {1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0};
 
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
     // Take the power 10 of the acceptor levels
@@ -50,7 +50,7 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     device my_device;
     my_device
         .set_up_complex_diode(x_length, nb_points, donor_length, intrisic_length, donor_level, intrisic_level, acceptor_x, acceptor_levels);
-    my_device.smooth_doping_profile(10);
+    my_device.smooth_doping_profile(5);
     // int         thread_num = omp_get_thread_num();
     // std::string file_name  = fmt::format("REES/doping_profile_{}_{}.txt", thread_num, IDX_ITER);
     // IDX_ITER++;
@@ -116,11 +116,11 @@ int main(int argc, const char** argv) {
     std::size_t max_iter         = 500;
     std::size_t nb_parameters    = N_X;
     double      c1               = 2.0;
-    double      c2               = 0.25;
-    double      w                = 0.95;
+    double      c2               = 1.0;
+    double      w                = 0.9;
     double      velocity_scaling = 0.1;
 
-    Optimization::ParticleSwarm pso(1 * nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(2 * nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
