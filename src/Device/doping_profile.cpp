@@ -116,7 +116,7 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     }
     int nb_acceptor = list_x_acceptor.size();
 
-    for (std::size_t idx_acc = 0; idx_acc < nb_acceptor; ++idx_acc) {
+    for (std::size_t idx_acc = 0; idx_acc < nb_acceptor-1; ++idx_acc) {
         double x_init     = list_x_acceptor[idx_acc];
         double x_end      = list_x_acceptor[idx_acc + 1];
         double y_init     = list_acceptor_level[idx_acc];

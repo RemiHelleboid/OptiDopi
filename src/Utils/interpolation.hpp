@@ -17,15 +17,21 @@ namespace Utils {
 
 template <typename T>
 T interp1d(const std::vector<T> &x, const std::vector<T> &y, T xnew) { 
-    int i = 0;
-    while (x[i] < xnew) {
-        ++i;
+    if (x.size() != y.size()) {
+        throw std::runtime_error("x and y must have the same size");
     }
-    if (i == 0) {
+    if (x.size() < 2) {
+        throw std::runtime_error("x and y must have at least 2 elements");
+    }
+
+    // Find the index of the first element in x that is greater than xnew
+    auto it = std::upper_bound(x.begin(), x.end(), xnew);
+    if (it == x.begin()) {
         return y[0];
-    } else if (i == x.size()) {
+    } else if (it == x.end()) {
         return y[x.size() - 1];
     } else {
+        auto i = std::distance(x.begin(), it);
         return y[i - 1] + (y[i] - y[i - 1]) / (x[i] - x[i - 1]) * (xnew - x[i - 1]);
     }
 }
