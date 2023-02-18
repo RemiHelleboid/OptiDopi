@@ -122,7 +122,7 @@ void ParticleSwarm::optimize(std::size_t number_iterations) {
         update_particles();
         clip_particles();
         this->export_current_state();
-        std::cout << fmt::format("Best fitness: {:f}", m_best_fitness) << std::endl;
+        std::cout << fmt::format("\rIteration {:d}/{:d} -> Best fitness: {:.3f}", i, number_iterations, m_best_fitness) << std::flush;
     }
 }
 
