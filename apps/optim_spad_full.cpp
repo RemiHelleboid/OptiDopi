@@ -24,19 +24,21 @@
 
 static int IDX_ITER = 0;
 
-#define N_X 6
+#define N_X 11
 
 double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
     double      x_length        = 10.0;
-    std::size_t nb_points       = 350;
+    std::size_t nb_points       = 500;
     double      donor_length    = 1.0;
     double      intrisic_length = 0.0;
 
     double donor_level    = 5.0e19;
     double intrisic_level = 1.0e13;
 
-    std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
+    // std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
+    std::vector<double> acceptor_x = {[1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0]};
+
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
     // Take the power 10 of the acceptor levels
     std::transform(log_acceptor_levels.begin(), log_acceptor_levels.end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
@@ -97,7 +99,7 @@ int main(int argc, const char** argv) {
         std::filesystem::create_directory(DIR_RES);
     }
 
-    double min_doping = 1.0e15;
+    double min_doping = 1.0e13;
     double max_doping = 1.0e19;
 
     std::vector<double> min_values(N_X, log10(min_doping));
@@ -111,10 +113,10 @@ int main(int argc, const char** argv) {
 #pragma omp parallel
     { nb_particles = omp_get_num_threads(); }
     std::cout << "Number particles: " << nb_particles << std::endl;
-    std::size_t max_iter         = 200;
+    std::size_t max_iter         = 500;
     std::size_t nb_parameters    = N_X;
     double      c1               = 2.0;
-    double      c2               = 0.2;
+    double      c2               = 0.25;
     double      w                = 0.95;
     double      velocity_scaling = 0.1;
 
