@@ -131,10 +131,10 @@ int main(int argc, const char** argv) {
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
-    std::size_t max_iter         = 150;
+    std::size_t max_iter         = 400;
     std::size_t nb_parameters    = N_X;
-    double      c1               = 4.0;
-    double      c2               = 1.0;
+    double      c1               = 2.0;
+    double      c2               = 2.0;
     double      w                = 0.9;
     double      velocity_scaling = 0.05;
     std::size_t nb_particles = 4 * nb_threads;
