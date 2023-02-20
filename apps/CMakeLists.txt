@@ -14,9 +14,13 @@ add_executable(optim_spad_simple optim_spad_simple.cpp)
 target_link_libraries(optim_spad_simple libdevice libutils liboptim)
 target_link_libraries(optim_spad_simple fmt::fmt OpenMP::OpenMP_CXX)
 
-add_executable(optim_spad_full optim_spad_full.cpp)
-target_link_libraries(optim_spad_full fmt::fmt OpenMP::OpenMP_CXX)
-target_link_libraries(optim_spad_full libdevice libutils liboptim)
+add_executable(PSWARM_SPAD.x PSWARM_SPAD.cpp)
+target_link_libraries(PSWARM_SPAD.x fmt::fmt OpenMP::OpenMP_CXX)
+target_link_libraries(PSWARM_SPAD.x libdevice libutils liboptim)
+
+add_executable(SA_SPAD.x SA_SPAD.cpp)
+target_link_libraries(SA_SPAD.x fmt::fmt OpenMP::OpenMP_CXX)
+target_link_libraries(SA_SPAD.x libdevice libutils liboptim)
 
 add_executable(test_interp test_interp.cpp)
 target_link_libraries(test_interp libdevice libutils liboptim)
