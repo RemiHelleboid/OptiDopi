@@ -35,7 +35,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     double              intrisic_length = 0.0;
     double              donor_level     = 5.0e19;
     double              intrisic_level  = 1.0e13;
-    std::vector<double> acceptor_x      = {1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0};
+    std::vector<double> acceptor_x      = {1.0, 1.25, 1.50, 1.75, 2.0, 3.0, 4.0, 5.0, 7.0, 8.0, 10.0};
 
     for (std::size_t i = 0; i < best_path.size(); ++i) {
         std::vector<double> acceptor_levels(best_path[i].size());
