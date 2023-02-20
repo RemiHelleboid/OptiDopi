@@ -65,7 +65,7 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
     double intrisic_level = 1.0e13;
 
     // std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
-    std::vector<double> acceptor_x = {1.0, 1.10, 1.20, 1.30, 1.40, 1.50, 1.75, 2.0, 3.0, 6.0, 10.0};
+    std::vector<double> acceptor_x = {1.0, 1.20, 1.40, 1.60, 1.80, 2.0, 1.5, 3.0, 5.0, 7.0, 10.0};
 
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
     // Take the power 10 of the acceptor levels
@@ -127,24 +127,24 @@ int main(int argc, const char** argv) {
     // fmt print
     fmt::print("x_acceptors: {}\n", x_acceptors);
 
-    std::size_t nb_particles = 1;
+    std::size_t nb_threads = 1;
 #pragma omp parallel
-    { nb_particles = omp_get_num_threads(); }
-    std::cout << "Number particles: " << nb_particles << std::endl;
-    std::size_t max_iter         = 250;
+    { nb_threads = omp_get_num_threads(); }
+    std::cout << "Number threads: " << nb_threads << std::endl;
+    std::size_t max_iter         = 150;
     std::size_t nb_parameters    = N_X;
-    double      c1               = 3.0;
+    double      c1               = 4.0;
     double      c2               = 1.0;
     double      w                = 0.9;
-    double      velocity_scaling = 0.5;
-
+    double      velocity_scaling = 0.05;
+    std::size_t nb_particles = 4 * nb_threads;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
     pso.set_social_weight(c2);
     pso.set_inertia_weight(w);
     pso.set_velocity_scaling(velocity_scaling);
-    pso.set_cognitive_learning_scheme(Optimization::LearningScheme::Linear);
+    pso.set_cognitive_learning_scheme(Optimization::LearningScheme::Constant);
     pso.optimize();
 
     auto best_path = pso.get_history_best_position();
