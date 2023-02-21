@@ -29,7 +29,6 @@ static int IDX_ITER = 0;
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     std::vector<double> x_acc = utils::geomspace(length_donor, total_length, nb_points_acceptor);
-
     return x_acc;
 }
 
@@ -160,7 +159,7 @@ int main(int argc, const char** argv) {
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t                 max_iter         = 10;
+    std::size_t                 max_iter         = 100;
     double                      c1               = 2.0;
     double                      c2               = 2.0;
     double                      w                = 0.9;

@@ -26,14 +26,18 @@
 
 static int IDX_ITER = 0;
 
-#define N_X 6
+#define N_X 11
+
+std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
+    std::vector<double> x_acc = utils::geomspace(length_donor, total_length, nb_points_acceptor);
+    return x_acc;
+}
+
 
 void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
     std::filesystem::create_directories(dirname);
     const std::string poisson_dir = dirname + "/poisson_solution/";
     std::filesystem::create_directories(poisson_dir);
-    
-
     double              x_length        = 10.0;
     std::size_t         nb_points       = 500;
     double              donor_length    = 1.0;
@@ -46,7 +50,6 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     std::vector<double> list_bv(nb_iter);
     std::vector<double> list_brp(nb_iter);
     std::vector<double> list_dw(nb_iter);
-
     for (std::size_t i = 0; i < best_path.size(); ++i) {
         std::vector<double> acceptor_levels(best_path[i].size());
         std::transform(best_path[i].begin(), best_path[i].end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
@@ -78,19 +81,24 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     }
 }
 
-double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
+double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
     double      x_length        = 10.0;
     std::size_t nb_points       = 500;
-    double      donor_length    = 1.0;
+    double      ddonor_length   = 1.0;
     double      intrisic_length = 0.0;
 
-    double donor_level    = 5.0e19;
+    double donor_level    = pow(10, log_donor_level);
     double intrisic_level = 1.0e13;
 
     // std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
-    std::vector<double> acceptor_x = {1.0, 1.50, 2.0, 3.0, 5.0, 10.0};
-
+    double              dx_fine    = 0.20;
+    double              dx_neutral = 0.50;
+    double              dx_coarse  = 2.0;
+    std::vector<double> acceptor_x = x_acceptors(donor_length, x_length, N_X);
+    // Print the acceptor x vector
+    // fmt::print("acceptor_x = {}\n", acceptor_x);
+    // std::cout << "Size of acceptor_x = " << acceptor_x.size() << std::endl;
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
     // Take the power 10 of the acceptor levels
     std::transform(log_acceptor_levels.begin(), log_acceptor_levels.end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
@@ -100,8 +108,14 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
         exit(1);
     }
     device my_device;
-    my_device
-        .set_up_complex_diode(x_length, nb_points, donor_length, intrisic_length, donor_level, intrisic_level, acceptor_x, acceptor_levels);
+    my_device.set_up_complex_diode(x_length,
+                                   nb_points,
+                                   ddonor_length,
+                                   intrisic_length,
+                                   donor_level,
+                                   intrisic_level,
+                                   acceptor_x,
+                                   acceptor_levels);
     my_device.smooth_doping_profile(5);
 
     double       target_anode_voltage  = 30.0;
@@ -121,16 +135,26 @@ double intermediate_cost_function(std::vector<double> log_acceptor_levels) {
 
     cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
     double               cost         = cost_resultr.total_cost;
-    // fmt::print("Cost: {:.5e}\n", cost);
     return cost;
 }
 
+/**
+ * @brief Cost function that will be called by the optimizer.
+ * The first two variables are the donor length and the donor level.
+ * The other variables are the acceptor levels.
+ *
+ * @param variables
+ * @return double
+ */
 double cost_function(std::vector<double> variables) {
-    // Call the intermediate cost function
-    double cost = intermediate_cost_function(variables);
+    double              donor_length    = variables[0];
+    double              log_donor_level = variables[1];
+    std::vector<double> log_acceptor_levels(variables.begin() + 2, variables.end());
+    double              cost = intermediate_cost_function(donor_length, log_donor_level, log_acceptor_levels);
     // fmt::print("Doping: {:.5e}, Length: {:.5e}, Cost: {:.5e}\n", pow(10, doping_acceptor), length_intrinsic, cost);
     return cost;
 }
+
 
 int main(int argc, const char** argv) {
     const std::string timestamp = fmt::format("{:%Y-%m-%d_%H-%M-%S}", fmt::localtime(std::time(nullptr)));
@@ -143,16 +167,23 @@ int main(int argc, const char** argv) {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 20;
+    std::size_t     max_iter         = 200;
     double          initial_temp     = 500;
     double          final_temp       = 0.001;
-    std::size_t     nb_parameters    = N_X;
+    std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
 
-    double              min_doping = 1.0e13;
-    double              max_doping = 1.0e19;
-    std::vector<double> min_values(N_X, log10(min_doping));
-    std::vector<double> max_values(N_X, log10(max_doping));
+    // Boundaries setup
+    double              min_length_donor = 0.1;
+    double              max_length_donor = 5.0;
+    double              min_doping       = 1.0e13;
+    double              max_doping       = 1.0e19;
+    std::vector<double> min_values(nb_parameters);
+    std::vector<double> max_values(nb_parameters);
+    min_values[0] = min_length_donor;
+    max_values[0] = max_length_donor;
+    std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
+    std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
