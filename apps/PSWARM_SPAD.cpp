@@ -159,7 +159,7 @@ int main(int argc, const char** argv) {
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t                 max_iter         = 100;
+    std::size_t                 max_iter         = 400;
     double                      c1               = 2.0;
     double                      c2               = 2.0;
     double                      w                = 0.9;
