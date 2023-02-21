@@ -114,7 +114,7 @@ class ParticleSwarm {
     double                                  get_best_fitness() const { return m_best_fitness; }
     const std::vector<std::vector<double>>& get_history_best_position() const { return m_history_best_position; }
 
-    void set_file_export(const std::string& dir_name) { m_dir_export = dir_name; }
+    void set_dir_export(const std::string& dir_name) { m_dir_export = dir_name; }
 
     void set_up_export();
     void export_current_state();

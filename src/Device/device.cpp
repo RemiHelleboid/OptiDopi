@@ -69,6 +69,19 @@ void device::export_poisson_solution(const std::string& directory_name, const st
     std::cout << "Exporting the poisson solution to the directory " << directory_name << " done." << std::endl;
 }
 
+void device::export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const {
+    // Find nearest voltage
+    auto it = std::lower_bound(m_list_voltages.begin(), m_list_voltages.end(), voltage);
+    if (it == m_list_voltages.end()) {
+        std::cout << "Voltage " << voltage << " not found in the list of voltages. Max voltage = " << m_list_voltages.back() << std::endl;
+        return;
+    }
+    std::size_t idx_voltage = std::distance(m_list_voltages.begin(), it);
+    std::filesystem::create_directories(directory_name);
+    const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
+    m_list_poisson_solutions[idx_voltage].export_to_file(filename);
+}
+
 void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     double index_step     = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
     int    index_step_int = int(index_step);
@@ -242,13 +255,13 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     double BV_cost              = alpha_BV * std::pow((BreakdownVoltage - BV_Target) / BV_Target, 2);
     double BP_cost              = -alpha_BP * BreakdownProbability;
     double meter_to_micron      = 1.0e6;
-    double DW_cost              = -alpha_DW * DepletionWidth * meter_to_micron;
+    double DW_cost              = -alpha_DW * (DepletionWidth / m_doping_profile.get_x_line().back()) * meter_to_micron;
     if (std::isnan(BV_cost)) {
         BV_cost = 1.0e6;
     }
     double cost = BV_cost + BP_cost + DW_cost + total_acceptor_obj;
     // Print all costs
-    // fmt::print("BV cost: {:10.5f} BP cost: {:10.5f} DW cost: {:10.5f} Acceptors cost: {:10.5f} Total cost: {:10.5f}\n",
+    // fmt::print("BV cost: {:7.2e} BP cost: {:7.2f} DW cost: {:7.2f} Acceptors cost: {:7.2f} ---> Total cost: {:10.2f}\n",
     //            BV_cost,
     //            BP_cost,
     //            DW_cost,

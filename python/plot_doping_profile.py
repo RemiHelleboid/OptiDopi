@@ -25,7 +25,7 @@ def plot_doping_profile(filename):
     plt.show()
 
 def animation_deoping(dirname):
-    file_list = glob.glob(dirname + '/*.*')
+    file_list = glob.glob(dirname + '/doping*.csv')
     file_list.sort()
     print(f"No. of files: {len(file_list)}")
     

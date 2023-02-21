@@ -37,7 +37,6 @@ ParticleSwarm::ParticleSwarm(std::size_t                                       m
     }
 
     m_best_position.resize(m_number_dimensions);
-    this->set_up_export();
     m_random_engine.seed(m_random_device());
 }
 
@@ -142,13 +141,14 @@ double ParticleSwarm::compute_mean_distance() const {
 }
 
 void ParticleSwarm::optimize() {
+    this->set_up_export();
     initialize_particles();
     while (m_current_iteration <= m_max_iterations) {
         update_particles();
         m_current_iteration++;
         this->export_current_state();
         double mean_distance = compute_mean_distance();
-        std::cout << fmt::format("\rIteration {:d}/{:d} -> Best fitness: {:.3f} (mean distance: {:.3f})",
+        std::cout << fmt::format("\rIteration {:5d}/{:5d} -> Best fitness: {:7.2f} (mean distance: {:7.2f})",
                                  m_current_iteration,
                                  m_max_iterations,
                                  m_best_fitness,
@@ -165,7 +165,7 @@ void ParticleSwarm::optimize() {
 }
 
 void ParticleSwarm::set_up_export() {
-    std::cout << "Setting up export..." << std::endl;
+    std::cout << "Setting up export... in : " << m_dir_export << std::endl;
     // Create directory for output
     if (std::filesystem::exists(m_dir_export)) {
         std::filesystem::remove_all(m_dir_export);

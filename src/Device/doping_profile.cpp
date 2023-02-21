@@ -44,6 +44,8 @@ void doping_profile::smooth_doping_profile(int window_size) {
 
 void doping_profile::re_compute_total_doping() {
     if (m_acceptor_concentration.size() != m_donor_concentration.size()) {
+        std::cout << "Donor size: " << m_donor_concentration.size() << std::endl;
+        std::cout << "Acceptor size: " << m_acceptor_concentration.size() << std::endl;
         throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
     }
     m_doping_concentration.resize(m_acceptor_concentration.size());
@@ -93,8 +95,8 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     if (list_x_acceptor.size() != list_acceptor_level.size()) {
         throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
     }
-    if (list_x_acceptor.back() > xlength) {
-        throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
+    if (list_x_acceptor.back() > xlength + 1e-6) {
+        throw std::logic_error("Last acceptor position is larger than the total length of the device.");
     }
     m_x_line = utils::linspace(0.0, xlength, number_points);
     m_donor_concentration.clear();

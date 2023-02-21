@@ -19,6 +19,7 @@ struct SimulatedAnnealHistory {
     std::vector<double>              temperatures;
 
     void export_to_csv(const std::string& filename) {
+        fmt::print("Exporting to {} ...", filename);
         std::ofstream file(filename);
         file << "iteration,cost,temperature";
         for (std::size_t i = 0; i < solutions[0].size(); ++i) {
@@ -55,6 +56,8 @@ class SimulatedAnnealing {
     std::mt19937                           m_generator;
     std::uniform_real_distribution<double> m_distribution;
 
+    std::size_t m_frequency_print = 100;
+
     /**
      * @brief Cost function
      * First argument is the variables vector.
@@ -90,7 +93,7 @@ class SimulatedAnnealing {
     double m_current_cost;
     double m_best_cost;
 
-    std::unique_ptr<SimulatedAnnealHistory> m_history;
+    SimulatedAnnealHistory m_history;
 
     std::string m_prefix_name = "";
 
@@ -105,6 +108,7 @@ class SimulatedAnnealing {
     const std::string&  get_prefix_name() const { return m_prefix_name; }
     void                set_prefix_name(const std::string& prefix_name) { m_prefix_name = prefix_name; }
     void                set_bounds(std::vector<std::pair<double, double>> bounds);
+    void                set_bounds(std::vector<double> bounds_min, std::vector<double> bounds_max);
     std::vector<double> clip_variables(const std::vector<double>& variables) const;
 
     void set_initial_solution(std::vector<double> initial_solution);
@@ -122,6 +126,7 @@ class SimulatedAnnealing {
     void add_current_solution_to_history();
 
     void set_cooling_schedule(CoolingSchedule cooling_schedule) { m_cooling_schedule = cooling_schedule; }
+    void set_frequency_print(std::size_t frequency_print) { m_frequency_print = frequency_print; }
 
     void linear_cooling();
     void geometrical_cooling(double alpha);
@@ -131,4 +136,7 @@ class SimulatedAnnealing {
     std::vector<double> neighbour_function();
 
     void run();
+
+    SimulatedAnnealHistory get_history() const { return m_history; }
+    void                   export_history();
 };
