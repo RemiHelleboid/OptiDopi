@@ -153,15 +153,19 @@ int main(int argc, const char** argv) {
     max_values[0] = max_length_donor;
     std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
     std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
+    // Donnor levels
+    min_values[1] = 17;
+    max_values[1] = 20;
+    
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t                 max_iter         = 400;
-    double                      c1               = 2.0;
-    double                      c2               = 2.0;
+    std::size_t                 max_iter         = 100;
+    double                      c1               = 1.2;
+    double                      c2               = 3.0;
     double                      w                = 0.9;
     double                      velocity_scaling = 0.5;
     std::size_t                 nb_particles     = nb_threads;

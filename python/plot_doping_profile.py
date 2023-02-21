@@ -60,7 +60,7 @@ def animation_deoping(dirname):
     
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(file_list), interval=100, blit=False, repeat=False)
     plt.show()
-    anim.save('anim_best_doping_profile_pso.mp4', fps=10, extra_args=['-vcodec', 'libx264'], dpi=300)
+    anim.save('anim_doping_profile.mp4', fps=10, extra_args=['-vcodec', 'libx264'], dpi=300)
     
 
 if __name__ == '__main__':

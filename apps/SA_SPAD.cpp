@@ -167,7 +167,7 @@ int main(int argc, const char** argv) {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 200;
+    std::size_t     max_iter         = 800;
     double          initial_temp     = 500;
     double          final_temp       = 0.001;
     std::size_t     nb_parameters    = N_X + 2;
@@ -182,8 +182,11 @@ int main(int argc, const char** argv) {
     std::vector<double> max_values(nb_parameters);
     min_values[0] = min_length_donor;
     max_values[0] = max_length_donor;
+    // Donnor levels
     std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
     std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
+    min_values[1] = 17;
+    max_values[1] = 20;
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
