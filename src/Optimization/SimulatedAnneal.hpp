@@ -19,7 +19,6 @@ struct SimulatedAnnealHistory {
     std::vector<double>              temperatures;
 
     void export_to_csv(const std::string& filename) {
-        fmt::print("Exporting to {} ...", filename);
         std::ofstream file(filename);
         file << "iteration,cost,temperature";
         for (std::size_t i = 0; i < solutions[0].size(); ++i) {

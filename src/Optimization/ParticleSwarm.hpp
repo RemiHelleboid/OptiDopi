@@ -104,11 +104,13 @@ class ParticleSwarm {
     void set_social_learning_scheme(LearningScheme learning_scheme) { m_social_learning_scheme = learning_scheme; }
 
     void   initialize_particles();
+    void   initialize_particles(const std::vector<double>& initial_position);
     void   update_particles();
     void   clip_particles();
     double compute_mean_distance() const;
 
     void optimize();
+    void asynchronous_optimize();
 
     std::vector<double>                     get_best_position() const { return m_best_position; }
     double                                  get_best_fitness() const { return m_best_fitness; }

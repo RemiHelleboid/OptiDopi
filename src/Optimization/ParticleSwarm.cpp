@@ -82,6 +82,31 @@ void ParticleSwarm::initialize_particles() {
     this->export_current_state();
 }
 
+void ParticleSwarm::initialize_particles(const std::vector<double>& initial_position) {
+    std::cout << "Initializing particles..." << std::endl;
+    for (std::size_t idx_particle = 0; idx_particle < m_number_particles; ++idx_particle) {
+        for (std::size_t i = 0; i < m_number_dimensions; ++i) {
+            m_particles[idx_particle].position[i] = initial_position[i];
+            // Velocity is initialized between -abs(max - min) and abs(max - min)
+            m_particles[idx_particle].velocity[i] =
+                -m_velocity_scaling + 2.0 * m_velocity_scaling * m_uniform_distribution(m_random_engine);
+        }
+        m_particles[idx_particle].best_position = m_particles[idx_particle].position;
+        m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
+    }
+
+    m_best_position = m_particles[0].position;
+    m_best_fitness  = m_particles[0].best_fitness;
+    for (std::size_t i = 1; i < m_number_particles; ++i) {
+        if (m_particles[i].best_fitness < m_best_fitness) {
+            m_best_position = m_particles[i].position;
+            m_best_fitness  = m_particles[i].best_fitness;
+        }
+    }
+    this->clip_particles();
+    this->export_current_state();
+}
+
 void ParticleSwarm::clip_particles() {
     for (auto& particle : m_particles) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
@@ -163,6 +188,7 @@ void ParticleSwarm::optimize() {
     }
     std::cout << std::endl;
 }
+
 
 void ParticleSwarm::set_up_export() {
     std::cout << "Setting up export... in : " << m_dir_export << std::endl;
