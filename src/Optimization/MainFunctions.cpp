@@ -28,11 +28,32 @@ namespace Optimization {
 
 static int IDX_ITER = 0;
 
-#define N_X 7
+#define N_X 12
+#define DopSmooth 7
+#define NBPOINTS 350
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     std::vector<double> x_acc = utils::geomspace(length_donor, total_length, nb_points_acceptor);
     return x_acc;
+}
+
+void set_up_bounds(double               length_min,
+                   double               length_max,
+                   double               log_donor_min,
+                   double               log_donor_max,
+                   double               log_accpetor_min,
+                   double               log_acceptor_max,
+                   std::vector<double>& min_bounds,
+                   std::vector<double>& max_bounds) {
+    min_bounds.resize(N_X + 2);
+    max_bounds.resize(N_X + 2);
+    // Donnor levels
+    min_bounds[0] = length_min;
+    max_bounds[0] = length_max;
+    min_bounds[1] = log_donor_min;
+    max_bounds[1] = log_accpetor_min;
+    std::fill(min_bounds.begin() + 1, min_bounds.end(), log_accpetor_min);
+    std::fill(max_bounds.begin() + 1, max_bounds.end(), log_acceptor_max);
 }
 
 void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
@@ -40,7 +61,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     std::cout << "Exporting best path to " << dirname << std::endl;
 
     double      x_length  = 10.0;
-    std::size_t nb_points = 500;
+    std::size_t nb_points = NBPOINTS;
     // double              donor_length    = 1.0;
     double intrisic_length = 0.0;
     // double              donor_level     = 5.0e19;
@@ -55,7 +76,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         device my_device;
         my_device
             .set_up_complex_diode(x_length, nb_points, length_don, intrisic_length, level_don, intrisic_level, acceptor_x, acceptor_levels);
-        my_device.smooth_doping_profile(5);
+        my_device.smooth_doping_profile(DopSmooth);
         my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
     }
 }
@@ -63,7 +84,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels) {
     // Create a complexe pin diode.
     double      x_length        = 10.0;
-    std::size_t nb_points       = 500;
+    std::size_t nb_points       = NBPOINTS;
     double      ddonor_length   = 1.0;
     double      intrisic_length = 0.0;
 
@@ -95,7 +116,7 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
                                    intrisic_level,
                                    acceptor_x,
                                    acceptor_levels);
-    my_device.smooth_doping_profile(5);
+    my_device.smooth_doping_profile(DopSmooth);
 
     double       target_anode_voltage  = 30.0;
     double       tol                   = 1.0e-6;
@@ -146,31 +167,29 @@ void MainParticleSwarmSPAD() {
 
     std::size_t nb_parameters = N_X + 2;
     // Boundaries setup
-    double              min_length_donor = 0.5;
+    // Boundaries setup
+    double              min_length_donor = 0.1;
     double              max_length_donor = 5.0;
-    double              min_doping       = 1.0e13;
-    double              max_doping       = 1.0e19;
+    double              min_doping       = 14.0;
+    double              max_doping       = 19.0;
+    double              donor_min_doping = 14.0;
+    double              donor_max_doping = 20.0;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
-    min_values[0] = min_length_donor;
-    max_values[0] = max_length_donor;
-    std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
-    std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
-    // Donnor levels
-    min_values[1] = 18;
-    max_values[1] = 20;
+    set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
+
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t                 max_iter         = 150;
-    double                      c1               = 3.0;
-    double                      c2               = 1.0;
-    double                      w                = 0.9;
-    double                      velocity_scaling = 0.5;
-    std::size_t                 nb_particles     = nb_threads * 2;
+    std::size_t max_iter         = 400;
+    double      c1               = 3.0;
+    double      c2               = 2.0;
+    double      w                = 0.8;
+    double      velocity_scaling = 1.0;
+    std::size_t nb_particles     = 10 * nb_parameters;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_dir_export(DIR_RES);
@@ -205,19 +224,15 @@ void MainSimulatedAnnealingSPAD() {
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
 
     // Boundaries setup
-    double              min_length_donor = 0.5;
+    double              min_length_donor = 0.1;
     double              max_length_donor = 5.0;
-    double              min_doping       = 1.0e13;
-    double              max_doping       = 1.0e19;
+    double              min_doping       = 14.0;
+    double              max_doping       = 19.0;
+    double              donor_min_doping = 14.0;
+    double              donor_max_doping = 20.0;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
-    min_values[0] = min_length_donor;
-    max_values[0] = max_length_donor;
-    // Donnor levels
-    std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
-    std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
-    min_values[1] = 16;
-    max_values[1] = 20;
+    set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
@@ -240,7 +255,7 @@ void MainSimulatedAnnealingSPAD() {
         sa.set_initial_solution(initial_solution);
         sa.set_prefix_name(directory);
         sa.set_bounds(min_values, max_values);
-        sa.set_alpha_cooling(0.98);
+        sa.set_alpha_cooling(0.99);
         sa.create_random_initial_solution();
         sa.set_frequency_print(50);
         sa.run();
@@ -266,15 +281,15 @@ void MainSimulatedAnnealingSPAD() {
     std::cout << "Best solution: " << fmt::format("{}", final_solutions[index]) << std::endl;
 
     // Copy the folder with the best solution into best_path_index
-    std::string best_path_folder = fmt::format("{}/thread_{}/history_optimization.csv", DIR_RES, index);
-    std::string new_path         = fmt::format("{}/best_path_{}/", DIR_RES, index);
+    std::string best_path_file = fmt::format("{}/thread_{}/history_optimization.csv", DIR_RES, index);
+    std::string new_path       = fmt::format("{}/best_path_{}/", DIR_RES, index);
     std::filesystem::create_directory(new_path);
-    std::filesystem::copy(best_path_folder, DIR_RES, std::filesystem::copy_options::recursive);
+    std::filesystem::copy(best_path_file, DIR_RES, std::filesystem::copy_options::recursive);
 
     // Get history of best path and save it
     std::cout << "Saving best path" << std::endl;
     std::vector<std::vector<double>> best_path = histories[index].solutions;
-    // export_best_path(best_path, DIR_RES + "best_path/");
+    export_best_path(best_path, new_path);
 }
 
 }  // namespace Optimization
