@@ -171,6 +171,7 @@ void MainParticleSwarmSPAD() {
     double                      w                = 0.9;
     double                      velocity_scaling = 0.5;
     std::size_t                 nb_particles     = nb_threads * 2;
+    std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_dir_export(DIR_RES);
     pso.set_bounds(min_values, max_values);
@@ -204,7 +205,7 @@ void MainSimulatedAnnealingSPAD() {
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
 
     // Boundaries setup
-    double              min_length_donor = 0.1;
+    double              min_length_donor = 0.5;
     double              max_length_donor = 5.0;
     double              min_doping       = 1.0e13;
     double              max_doping       = 1.0e19;
@@ -215,7 +216,7 @@ void MainSimulatedAnnealingSPAD() {
     // Donnor levels
     std::fill(min_values.begin() + 1, min_values.end(), log10(min_doping));
     std::fill(max_values.begin() + 1, max_values.end(), log10(max_doping));
-    min_values[1] = 17;
+    min_values[1] = 16;
     max_values[1] = 20;
 
     std::size_t nb_threads = 1;
@@ -229,7 +230,7 @@ void MainSimulatedAnnealingSPAD() {
 
     std::vector<SimulatedAnnealHistory> histories(nb_threads);
 
-    std::size_t nb_doe = 8;
+    std::size_t nb_doe = nb_threads;
 #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
     for (int i = 0; i < nb_doe; i++) {
         std::string directory = fmt::format("{}/thread_{}/", DIR_RES, i);
