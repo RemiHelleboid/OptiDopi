@@ -28,9 +28,9 @@ namespace Optimization {
 
 static int IDX_ITER = 0;
 
-#define N_X 12
-#define DopSmooth 7
-#define NBPOINTS 350
+#define N_X 3
+#define DopSmooth 11
+#define NBPOINTS 450
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     std::vector<double> x_acc = utils::geomspace(length_donor, total_length, nb_points_acceptor);
@@ -51,9 +51,9 @@ void set_up_bounds(double               length_min,
     min_bounds[0] = length_min;
     max_bounds[0] = length_max;
     min_bounds[1] = log_donor_min;
-    max_bounds[1] = log_accpetor_min;
-    std::fill(min_bounds.begin() + 1, min_bounds.end(), log_accpetor_min);
-    std::fill(max_bounds.begin() + 1, max_bounds.end(), log_acceptor_max);
+    max_bounds[1] = log_donor_max;
+    std::fill(min_bounds.begin() + 2, min_bounds.end(), log_accpetor_min);
+    std::fill(max_bounds.begin() + 2, max_bounds.end(), log_acceptor_max);
 }
 
 void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
@@ -78,6 +78,19 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
             .set_up_complex_diode(x_length, nb_points, length_don, intrisic_length, level_don, intrisic_level, acceptor_x, acceptor_levels);
         my_device.smooth_doping_profile(DopSmooth);
         my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+        // For the last point, we export run the poisson solver and export the potential
+        if (i == best_path.size() - 1) {
+            double       target_anode_voltage  = 30.0;
+            double       tol                   = 1.0e-8;
+            const int    max_iter              = 100;
+            double       voltage_step          = 0.01;
+            double       mcintyre_voltage_step = 0.25;
+            const double stop_above_bv         = 5.0;
+            double       BiasAboveBV           = 3.0;
+            my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
+            std::string poisson_dirname = fmt::format("{}/poisson", dirname);
+            my_device.export_poisson_solution(poisson_dirname, fmt::format("poisson_", i));
+        }
     }
 }
 
@@ -119,7 +132,7 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
     my_device.smooth_doping_profile(DopSmooth);
 
     double       target_anode_voltage  = 30.0;
-    double       tol                   = 1.0e-6;
+    double       tol                   = 1.0e-8;
     const int    max_iter              = 100;
     double       voltage_step          = 0.01;
     double       mcintyre_voltage_step = 0.25;
@@ -155,6 +168,10 @@ double cost_function(std::vector<double> variables) {
     return cost;
 }
 
+/**
+ * @brief Main function for the Particle Swarm Optimization.
+ *
+ */
 void MainParticleSwarmSPAD() {
     const std::string timestamp = fmt::format("{:%Y-%m-%d_%H-%M-%S}", fmt::localtime(std::time(nullptr)));
     const std::string DIR_RES   = fmt::format("results_pso/{}/", timestamp);
@@ -172,24 +189,23 @@ void MainParticleSwarmSPAD() {
     double              max_length_donor = 5.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
-    double              donor_min_doping = 14.0;
+    double              donor_min_doping = 19.0;
     double              donor_max_doping = 20.0;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
     set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
-
 
     std::size_t nb_threads = 1;
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t max_iter         = 400;
-    double      c1               = 3.0;
-    double      c2               = 2.0;
-    double      w                = 0.8;
-    double      velocity_scaling = 1.0;
-    std::size_t nb_particles     = 10 * nb_parameters;
+    std::size_t max_iter         = 200;
+    double      c1               = 4.5;
+    double      c2               = 1.;
+    double      w                = 0.95;
+    double      velocity_scaling = 0.01;
+    std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_dir_export(DIR_RES);
@@ -206,6 +222,10 @@ void MainParticleSwarmSPAD() {
     export_best_path(best_path, fmt::format("{}/BEST/", DIR_RES));
 }
 
+/**
+ * @brief MAIN FUNCTION FOR SIMULATED ANNEALING.
+ *
+ */
 void MainSimulatedAnnealingSPAD() {
     const std::string timestamp = fmt::format("{:%Y-%m-%d_%H-%M-%S}", fmt::localtime(std::time(nullptr)));
     const std::string DIR_RES   = fmt::format("results_sa/{}/", timestamp);
@@ -217,18 +237,18 @@ void MainSimulatedAnnealingSPAD() {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 500;
+    std::size_t     max_iter         = 1000;
     double          initial_temp     = 500;
     double          final_temp       = 0.001;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-
+    double          cooling_factor   = 0.99;
     // Boundaries setup
     double              min_length_donor = 0.1;
     double              max_length_donor = 5.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
-    double              donor_min_doping = 14.0;
+    double              donor_min_doping = 19.0;
     double              donor_max_doping = 20.0;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
@@ -255,7 +275,7 @@ void MainSimulatedAnnealingSPAD() {
         sa.set_initial_solution(initial_solution);
         sa.set_prefix_name(directory);
         sa.set_bounds(min_values, max_values);
-        sa.set_alpha_cooling(0.99);
+        sa.set_alpha_cooling(cooling_factor);
         sa.create_random_initial_solution();
         sa.set_frequency_print(50);
         sa.run();

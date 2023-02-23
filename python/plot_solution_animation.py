@@ -24,6 +24,8 @@ def animation_sol(DIR):
     # Sort the list of files according to the voltage
     list_files = [x for _, x in sorted(zip(list_voltage, list_files))]
 
+    print(f"Number of files: {len(list_files)}")
+
     listX, listU, listeDensity, listhDensity, listEF = [], [], [], [], []
     for file in list_files[::10]:
         X, U, eDensity, hDensity, ElectricField = import_data(file)

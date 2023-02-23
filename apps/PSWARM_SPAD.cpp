@@ -22,7 +22,11 @@
 #include "MainFunctions.hpp"
 
 int main(int argc, const char** argv) {
+    auto start = std::chrono::high_resolution_clock::now();
     Optimization::MainParticleSwarmSPAD();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    fmt::print("Total time : {:.3f} s \n\n", elapsed_seconds.count());
 
     double poisson_time              = NewtonPoissonSolver::get_poisson_solver_time();
     double mcintyre_time             = mcintyre::McIntyre::get_mcintyre_time();

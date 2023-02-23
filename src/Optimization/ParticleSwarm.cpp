@@ -69,15 +69,12 @@ void ParticleSwarm::initialize_particles() {
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
         m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
     }
-
-    m_best_position = m_particles[0].position;
-    m_best_fitness  = m_particles[0].best_fitness;
-    for (std::size_t i = 1; i < m_number_particles; ++i) {
-        if (m_particles[i].best_fitness < m_best_fitness) {
-            m_best_position = m_particles[i].position;
-            m_best_fitness  = m_particles[i].best_fitness;
-        }
-    }
+    // Find the best particle
+    auto it_best_particle = std::min_element(m_particles.begin(), m_particles.end(), [](const Particle& a, const Particle& b) {
+        return a.best_fitness < b.best_fitness;
+    });
+    m_best_position       = it_best_particle->position;
+    m_best_fitness        = it_best_particle->best_fitness;
     this->clip_particles();
     this->export_current_state();
 }
@@ -150,6 +147,21 @@ void ParticleSwarm::update_particles() {
     m_history_best_position.push_back(m_best_position);
 }
 
+void ParticleSwarm::add_partilce_at_barycenter() {
+    Particle particle(m_number_dimensions);
+    for (std::size_t i = 0; i < m_number_dimensions; ++i) {
+        double sum = 0.0;
+        for (std::size_t j = 0; j < m_number_particles; ++j) {
+            sum += m_particles[j].position[i];
+        }
+        particle.position[i] = sum / static_cast<double>(m_number_particles);
+    }
+    particle.best_position = particle.position;
+    particle.best_fitness  = m_fitness_function(particle.position);
+    m_particles.push_back(particle);
+    ++m_number_particles;
+}
+
 double ParticleSwarm::compute_mean_distance() const {
     double mean_distance = 0.0;
     for (std::size_t i = 0; i < m_number_particles; ++i) {
@@ -188,7 +200,6 @@ void ParticleSwarm::optimize() {
     }
     std::cout << std::endl;
 }
-
 
 void ParticleSwarm::set_up_export() {
     std::cout << "Setting up export... in : " << m_dir_export << std::endl;

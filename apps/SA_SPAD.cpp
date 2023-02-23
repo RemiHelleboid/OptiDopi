@@ -25,8 +25,11 @@
 
 int main(int argc, const char** argv) {
     // Simulated annealing
-
+    auto start = std::chrono::high_resolution_clock::now();
     Optimization::MainSimulatedAnnealingSPAD();
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end - start;
+    fmt::print("Total time : {} s \n\n", elapsed_seconds.count());
 
     double poisson_time              = NewtonPoissonSolver::get_poisson_solver_time();
     double mcintyre_time             = mcintyre::McIntyre::get_mcintyre_time();

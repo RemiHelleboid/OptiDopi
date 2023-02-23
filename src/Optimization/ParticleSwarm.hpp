@@ -108,6 +108,7 @@ class ParticleSwarm {
     void   update_particles();
     void   clip_particles();
     double compute_mean_distance() const;
+    void   add_partilce_at_barycenter();
 
     void optimize();
     void asynchronous_optimize();
