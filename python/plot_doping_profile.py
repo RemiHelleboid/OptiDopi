@@ -30,10 +30,13 @@ def animation_deoping(dirname):
     print(f"No. of files: {len(file_list)}")
     
     list_X, listY = [], []
+    listD, listA = [], []
     for filename in file_list:
         data = import_data(filename)
         list_X.append(data[:,0])
         listY.append(np.abs(data[:,3]))
+        listD.append(data[:,1])
+        listA.append(data[:,2])
     
     fig, ax = plt.subplots()
     ax.set_xlabel('x ($\mu$m)')
@@ -43,20 +46,26 @@ def animation_deoping(dirname):
     ax.set_ylim(1e11, 1e20)
     ax.set_title('Iteration: 0')
 
-    line, = ax.plot(list_X[0], listY[0], lw=4, c='b')
+    line, = ax.plot(list_X[0], listY[0], lw=2, c='k', ls='-', zorder=100)
+    line2, = ax.plot(list_X[0], listD[0], lw=4, c='b', ls='-')
+    line3, = ax.plot(list_X[0], listA[0], lw=4, c='r', ls='-')
     s = ax.set_title(f'Iteration: 0')
 
     fig.tight_layout()
 
     def init():
         line.set_data([], [])
+        line2.set_data([], [])
+        line3.set_data([], [])
         s = ax.set_title(f'Iteration: 0')
-        return line,
+        return line, s, line2, line3
     
     def animate(i):
         line.set_data(list_X[i], listY[i])
+        line2.set_data(list_X[i], listD[i])
+        line3.set_data(list_X[i], listA[i])
         ax.set_title(f'Iteration: {i}')
-        return line, s
+        return line, ax, line2, line3
     
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=len(file_list), interval=100, blit=False, repeat=False)
     plt.show()

@@ -105,12 +105,19 @@ std::vector<double> SimulatedAnnealing::neighbour_function() {
     return clip_variables(new_solution);
 }
 
+void SimulatedAnnealing::restart() {
+    m_current_solution = m_best_solution;
+    m_current_cost     = m_best_cost;
+}
+
+
 void SimulatedAnnealing::run() {
     m_current_cost  = m_cost_function(m_current_solution);
     m_best_solution = m_current_solution;
     m_best_cost     = m_current_cost;
 
     std::size_t nb_iter_with_change = 0;
+    std::size_t nb_iter_without_change = 0;
     while (m_current_iteration < m_max_iterations && m_temperature > m_final_temperature) {
         std::vector<double> new_solution = neighbour_function();
         double              new_cost     = m_cost_function(new_solution);
@@ -126,6 +133,8 @@ void SimulatedAnnealing::run() {
                 m_current_solution = new_solution;
                 m_current_cost     = new_cost;
                 nb_iter_with_change++;
+            } else {
+                nb_iter_without_change++;
             }
         }
 
@@ -155,8 +164,18 @@ void SimulatedAnnealing::run() {
         if (m_current_iteration % m_frequency_print == 0) {
             fmt::print("{}, {:.2e}, {:.5e} Ratio: {:.2f}\n", m_current_iteration, m_temperature, m_current_cost, ratio);
         }
+    
         ++m_current_iteration;
+
+        if (nb_iter_without_change > int(m_max_iterations / 5)) {
+            std::cout << "Restart" << std::endl;
+            restart();
+            nb_iter_without_change = 0;
+        }
     }
+
+
+
     fmt::print("{}, {:.2e}, {:.2e}\n", m_current_iteration, m_temperature, m_current_cost);
     // fmt::print("Best solution: {}, cost: {}\n", m_best_solution[0], m_best_cost);
 }

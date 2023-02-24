@@ -181,11 +181,12 @@ void ParticleSwarm::optimize() {
     this->set_up_export();
     initialize_particles();
     while (m_current_iteration <= m_max_iterations) {
+        // add_partilce_at_barycenter();
         update_particles();
         m_current_iteration++;
         this->export_current_state();
         double mean_distance = compute_mean_distance();
-        std::cout << fmt::format("\rIteration {:5d}/{:5d} -> Best fitness: {:7.2f} (mean distance: {:7.2f})",
+        std::cout << fmt::format("\rIteration {:5d}/{:5d} -> Best fitness: {:7.4f} (mean distance: {:7.2f})",
                                  m_current_iteration,
                                  m_max_iterations,
                                  m_best_fitness,

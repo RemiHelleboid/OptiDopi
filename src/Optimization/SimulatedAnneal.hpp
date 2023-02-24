@@ -134,7 +134,9 @@ class SimulatedAnnealing {
 
     std::vector<double> neighbour_function();
 
+
     void run();
+    void restart();
 
     SimulatedAnnealHistory get_history() const { return m_history; }
     void                   export_history();

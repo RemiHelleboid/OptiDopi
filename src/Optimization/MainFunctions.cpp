@@ -28,13 +28,30 @@ namespace Optimization {
 
 static int IDX_ITER = 0;
 
-#define N_X 3
+#define N_X 8
 #define DopSmooth 11
-#define NBPOINTS 450
+#define NBPOINTS 500
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
-    std::vector<double> x_acc = utils::geomspace(length_donor, total_length, nb_points_acceptor);
-    return x_acc;
+    // The x positions are first on a fine grid then on a coarse grid
+    double dx_fine        = 0.25;
+    double size_fine_area = 1.0;
+
+    std::vector<double> x_acceptor(nb_points_acceptor);
+    x_acceptor[0] = length_donor;
+
+    // First we fill the fine area
+    std::size_t i = 1;
+    while (x_acceptor[i - 1] < length_donor + size_fine_area) {
+        x_acceptor[i] = x_acceptor[i - 1] + dx_fine;
+        ++i;
+    }
+    double dx_coarse = (total_length - length_donor - size_fine_area) / (nb_points_acceptor - i);
+    while (i < nb_points_acceptor) {
+        x_acceptor[i] = x_acceptor[i - 1] + dx_coarse;
+        ++i;
+    }
+    return x_acceptor;
 }
 
 void set_up_bounds(double               length_min,
@@ -90,6 +107,18 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
             my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
             std::string poisson_dirname = fmt::format("{}/poisson", dirname);
             my_device.export_poisson_solution(poisson_dirname, fmt::format("poisson_", i));
+
+            cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
+            double               cost         = cost_resultr.total_cost;
+
+            double BreakdownVoltage     = my_device.extract_breakdown_voltage(1.0e-6);
+            double BreakdownProbability = my_device.get_brp_at_voltage(BreakdownVoltage + BiasAboveBV);
+            double DepletionWidth       = my_device.get_depletion_at_voltage(BreakdownVoltage + 3.0);
+
+            fmt::print("Breakdown voltage               : {}\n", BreakdownVoltage);
+            fmt::print("Breakdown probability           : {}\n", BreakdownProbability);
+            fmt::print("Depletion width                 : {}\n", DepletionWidth);
+            fmt::print("Cost function                   : {}\n", cost);
         }
     }
 }
@@ -147,7 +176,12 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
     }
 
     cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
+    double               BV           = cost_resultr.result.BV;
+    double               BRP          = cost_resultr.result.BrP;
+    double               DW           = cost_resultr.result.DW;
     double               cost         = cost_resultr.total_cost;
+
+    // fmt::print("BV: {:.2f}, BRP: {:.2f}, DW: {:.2e}, Cost: {:.2f}\n", BV, BRP, DW, cost);
     return cost;
 }
 
@@ -185,11 +219,11 @@ void MainParticleSwarmSPAD() {
     std::size_t nb_parameters = N_X + 2;
     // Boundaries setup
     // Boundaries setup
-    double              min_length_donor = 0.1;
-    double              max_length_donor = 5.0;
+    double              min_length_donor = 0.5;
+    double              max_length_donor = 0.50001;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
-    double              donor_min_doping = 19.0;
+    double              donor_min_doping = 16.0;
     double              donor_max_doping = 20.0;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
@@ -200,12 +234,12 @@ void MainParticleSwarmSPAD() {
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t max_iter         = 200;
-    double      c1               = 4.5;
-    double      c2               = 1.;
-    double      w                = 0.95;
-    double      velocity_scaling = 0.01;
-    std::size_t nb_particles     = 1 * nb_threads;
+    std::size_t max_iter         = 20;
+    double      c1               = 2.0;
+    double      c2               = 2.0;
+    double      w                = 0.9;
+    double      velocity_scaling = 0.2;
+    std::size_t nb_particles     = 10 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_dir_export(DIR_RES);
@@ -238,14 +272,14 @@ void MainSimulatedAnnealingSPAD() {
 
     // Create simulated annealing object
     std::size_t     max_iter         = 1000;
-    double          initial_temp     = 500;
-    double          final_temp       = 0.001;
+    double          initial_temp     = 20;
+    double          final_temp       = 0.01;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-    double          cooling_factor   = 0.99;
+    double          cooling_factor   = 0.98;
     // Boundaries setup
-    double              min_length_donor = 0.1;
-    double              max_length_donor = 5.0;
+    double              min_length_donor = 0.5;
+    double              max_length_donor = 0.50001;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = 19.0;

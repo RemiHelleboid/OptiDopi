@@ -20,13 +20,34 @@
 #include "PoissonSolver.hpp"
 #include "doping_profile.hpp"
 
-struct cost_function_result {
-    double BV_cost;
-    double BP_cost;
-    double DW_cost;
-    double total_cost;
+struct result_simu {
+    double BV  = 0.0;
+    double BrP = 0.0;
+    double DW  = 0.0;
 
     void set_NaN() {
+        BV  = std::numeric_limits<double>::quiet_NaN();
+        BrP = std::numeric_limits<double>::quiet_NaN();
+        DW  = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    void set_very_high() {
+        BV  = 1.0e6;
+        BrP = 1.0e6;
+        DW  = 1.0e6;
+    }
+};
+
+struct cost_function_result {
+    result_simu result;
+    double      BV_cost;
+    double      BP_cost;
+    double      DW_cost;
+    double      total_cost;
+
+
+    void set_NaN() {
+        result.set_NaN();
         BV_cost    = -std::numeric_limits<double>::quiet_NaN();
         BP_cost    = std::numeric_limits<double>::quiet_NaN();
         DW_cost    = std::numeric_limits<double>::quiet_NaN();
