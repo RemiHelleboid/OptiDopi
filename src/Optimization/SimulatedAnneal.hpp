@@ -62,7 +62,7 @@ class SimulatedAnnealing {
      * First argument is the variables vector.
      *
      */
-    std::function<double(std::vector<double>)> m_cost_function;
+    std::function<double(std::vector<double>, const std::vector<double>&)> m_cost_function;
 
     /**
      * @brief Cooling function, returns the new temperature based on the current temperature.
@@ -103,7 +103,7 @@ class SimulatedAnnealing {
                        std::size_t                                max_iterations,
                        double                                     initial_temperature,
                        double                                     final_temperature,
-                       std::function<double(std::vector<double>)> cost_function);
+                       std::function<double(std::vector<double>, const std::vector<double>&)> cost_function);
     const std::string&  get_prefix_name() const { return m_prefix_name; }
     void                set_prefix_name(const std::string& prefix_name) { m_prefix_name = prefix_name; }
     void                set_bounds(std::vector<std::pair<double, double>> bounds);

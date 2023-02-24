@@ -13,12 +13,12 @@
 #include "fmt/format.h"
 #include "fmt/ostream.h"
 
-SimulatedAnnealing::SimulatedAnnealing(std::size_t                                m_nb_variables,
-                                       CoolingSchedule                            cooling_schedule,
-                                       std::size_t                                max_iterations,
-                                       double                                     initial_temperature,
-                                       double                                     final_temperature,
-                                       std::function<double(std::vector<double>)> cost_function)
+SimulatedAnnealing::SimulatedAnnealing(std::size_t                                                            m_nb_variables,
+                                       CoolingSchedule                                                        cooling_schedule,
+                                       std::size_t                                                            max_iterations,
+                                       double                                                                 initial_temperature,
+                                       double                                                                 final_temperature,
+                                       std::function<double(std::vector<double>, const std::vector<double>&)> cost_function)
     : m_nb_variables(m_nb_variables),
       m_cooling_schedule(cooling_schedule),
       m_max_iterations(max_iterations),
@@ -110,21 +110,22 @@ void SimulatedAnnealing::restart() {
     m_current_cost     = m_best_cost;
 }
 
-
 void SimulatedAnnealing::run() {
-    m_current_cost  = m_cost_function(m_current_solution);
-    m_best_solution = m_current_solution;
-    m_best_cost     = m_current_cost;
+    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
+    m_current_cost             = m_cost_function(m_current_solution, params);
+    m_best_solution            = m_current_solution;
+    m_best_cost                = m_current_cost;
 
-    std::size_t nb_iter_with_change = 0;
-    std::size_t nb_iter_without_change = 0;
+    std::size_t nb_iter_with_change         = 0;
+    std::size_t nb_iter_without_improvement = 0;
     while (m_current_iteration < m_max_iterations && m_temperature > m_final_temperature) {
         std::vector<double> new_solution = neighbour_function();
-        double              new_cost     = m_cost_function(new_solution);
+        double              new_cost     = m_cost_function(new_solution, params);
         if (new_cost < m_current_cost) {
             m_current_solution = new_solution;
             m_current_cost     = new_cost;
             nb_iter_with_change++;
+            nb_iter_without_improvement = 0;
         } else {
             double delta_cost  = new_cost - m_current_cost;
             double probability = std::exp(-(new_cost - m_current_cost) / m_temperature);
@@ -133,8 +134,7 @@ void SimulatedAnnealing::run() {
                 m_current_solution = new_solution;
                 m_current_cost     = new_cost;
                 nb_iter_with_change++;
-            } else {
-                nb_iter_without_change++;
+                nb_iter_without_improvement++;
             }
         }
 
@@ -164,17 +164,16 @@ void SimulatedAnnealing::run() {
         if (m_current_iteration % m_frequency_print == 0) {
             fmt::print("{}, {:.2e}, {:.5e} Ratio: {:.2f}\n", m_current_iteration, m_temperature, m_current_cost, ratio);
         }
-    
-        ++m_current_iteration;
 
-        if (nb_iter_without_change > int(m_max_iterations / 5)) {
+        ++m_current_iteration;
+        params[0] = static_cast<double>(m_current_iteration);
+
+        if (nb_iter_without_improvement > int(m_max_iterations / 5)) {
             std::cout << "Restart" << std::endl;
             restart();
-            nb_iter_without_change = 0;
+            nb_iter_without_improvement = 0;
         }
     }
-
-
 
     fmt::print("{}, {:.2e}, {:.2e}\n", m_current_iteration, m_temperature, m_current_cost);
     // fmt::print("Best solution: {}, cost: {}\n", m_best_solution[0], m_best_cost);

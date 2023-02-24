@@ -38,7 +38,7 @@ static int IDX_ITER = 0;
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     // The x positions are first on a fine grid then on a coarse grid
     double dx_fine        = 0.25;
-    double size_fine_area = 1.0;
+    double size_fine_area = 1.5;
 
     std::vector<double> x_acceptor(nb_points_acceptor);
     x_acceptor[0] = length_donor;
@@ -111,7 +111,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         my_device.smooth_doping_profile(DopSmooth);
 
         // Solve the Poisson and McIntyre equations
-        double       target_anode_voltage  = 30.0;
+        double       target_anode_voltage  = 40.0;
         double       tol                   = 1.0e-8;
         const int    max_iter              = 100;
         double       voltage_step          = 0.01;
@@ -124,7 +124,8 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         if (!poisson_success) {
             fmt::print("Poisson failed\n");
         }
-        cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV);
+        double time = i / static_cast<double>(best_path.size());
+        cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
         double               BV          = cost_result.result.BV;
         double               BRP         = cost_result.result.BrP;
         double               DW          = cost_result.result.DW;
@@ -136,7 +137,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     }
 }
 
-double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels) {
+double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels, std::vector<double> parameters) {
     double              x_length         = 10.0;
     std::size_t         nb_points        = NBPOINTS;
     double              intrinsic_length = 0.0;
@@ -160,7 +161,7 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
                                    acceptor_levels);
     my_device.smooth_doping_profile(DopSmooth);
 
-    double       target_anode_voltage  = 30.0;
+    double       target_anode_voltage  = 40.0;
     double       tol                   = 1.0e-8;
     const int    max_iter              = 100;
     double       voltage_step          = 0.01;
@@ -174,8 +175,10 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
         // fmt::print("Poisson failed\n");
         return BIG_DOUBLE;
     }
-
-    cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV);
+    std::size_t iter_nb = parameters[0];
+    std::size_t max_iter_nb = parameters[1];
+    double time = parameters[0] / static_cast<double>(parameters[1]);
+    cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
     double               BV          = cost_result.result.BV;
     double               BRP         = cost_result.result.BrP;
     double               DW          = cost_result.result.DW;
@@ -193,14 +196,17 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
  * @param variables
  * @return double
  */
-double cost_function(std::vector<double> variables) {
+
+double costyy_function(std::vector<double> variables, const std::vector<double>& parameters) {
     double              donor_length    = variables[0];
     double              log_donor_level = variables[1];
     std::vector<double> log_acceptor_levels(variables.begin() + 2, variables.end());
-    double              cost = intermediate_cost_function(donor_length, log_donor_level, log_acceptor_levels);
+    double              cost = intermediate_cost_function(donor_length, log_donor_level, log_acceptor_levels, parameters);
     // fmt::print("Doping: {:.5e}, Length: {:.5e}, Cost: {:.5e}\n", pow(10, doping_acceptor), length_intrinsic, cost);
     return cost;
 }
+
+std::function<double(std::vector<double>, const std::vector<double>&)> cost_function_wrapper = costyy_function;
 
 /**
  * @brief Main function for the Particle Swarm Optimization.
@@ -238,10 +244,10 @@ void MainParticleSwarmSPAD() {
     double      c1               = 3.0;
     double      c2               = 1.0;
     double      w                = 0.9;
-    double      velocity_scaling = 0.2;
+    double      velocity_scaling = 0.1;
     std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
-    Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
+    Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
     pso.set_dir_export(DIR_RES);
     pso.set_bounds(min_values, max_values);
     pso.set_cognitive_weight(c1);
@@ -272,8 +278,8 @@ void MainSimulatedAnnealingSPAD() {
 
     // Create simulated annealing object
     std::size_t     max_iter         = 1000;
-    double          initial_temp     = 20;
-    double          final_temp       = 0.01;
+    double          initial_temp     = 10;
+    double          final_temp       = 0.005;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
     double          cooling_factor   = 0.95;
@@ -292,7 +298,7 @@ void MainSimulatedAnnealingSPAD() {
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
-    std::size_t nb_doe = 4;
+    std::size_t nb_doe = 8;
     std::cout << "Number DOE: " << nb_doe << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_doe);
@@ -305,7 +311,7 @@ void MainSimulatedAnnealingSPAD() {
     for (int i = 0; i < nb_doe; i++) {
         std::string directory = fmt::format("{}/thread_{}/", DIR_RES, i);
         std::filesystem::create_directory(directory);
-        SimulatedAnnealing  sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function);
+        SimulatedAnnealing  sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function_wrapper);
         std::vector<double> initial_solution = random_initial_position(min_values, max_values);
         sa.set_initial_solution(initial_solution);
         sa.set_prefix_name(directory);

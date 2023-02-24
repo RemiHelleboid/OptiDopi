@@ -28,7 +28,7 @@ namespace Optimization {
 ParticleSwarm::ParticleSwarm(std::size_t                                       max_iterations,
                              std::size_t                                       number_particles,
                              std::size_t                                       number_dimensions,
-                             std::function<double(const std::vector<double>&)> fitness_function)
+                             std::function<double(const std::vector<double>&, const std::vector<double>&)> fitness_function)
     : m_max_iterations(max_iterations),
       m_number_particles(number_particles),
       m_number_dimensions(number_dimensions),
@@ -70,7 +70,8 @@ void ParticleSwarm::initialize_particles() {
                 -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
         }
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
-        m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
+        std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
+        m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position, params);
     }
     // Find the best particle
     auto it_best_particle = std::min_element(m_particles.begin(), m_particles.end(), [](const Particle& a, const Particle& b) {
@@ -84,6 +85,7 @@ void ParticleSwarm::initialize_particles() {
 
 void ParticleSwarm::initialize_particles(const std::vector<double>& initial_position) {
     std::cout << "Initializing particles..." << std::endl;
+    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
     for (std::size_t idx_particle = 0; idx_particle < m_number_particles; ++idx_particle) {
         for (std::size_t i = 0; i < m_number_dimensions; ++i) {
             m_particles[idx_particle].position[i] = initial_position[i];
@@ -92,7 +94,7 @@ void ParticleSwarm::initialize_particles(const std::vector<double>& initial_posi
                 -m_velocity_scaling + 2.0 * m_velocity_scaling * m_uniform_distribution(m_random_engine);
         }
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
-        m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position);
+        m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position, params);
     }
 
     m_best_position = m_particles[0].position;
@@ -120,6 +122,7 @@ void ParticleSwarm::clip_particles() {
 }
 
 void ParticleSwarm::update_particles() {
+    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
     double current_cognitive_weight = m_cognitive_weight;
     if (m_cognitive_learning_scheme == LearningScheme::Linear) {
         current_cognitive_weight = m_cognitive_weight * (1.0 - (m_current_iteration / static_cast<double>(m_max_iterations)));
@@ -135,7 +138,7 @@ void ParticleSwarm::update_particles() {
             particle.position[i] += particle.velocity[i] * m_velocity_scaling;
         }
         this->clip_particles();
-        double fitness = m_fitness_function(particle.position);
+        double fitness = m_fitness_function(particle.position, params);
         if (fitness < particle.best_fitness) {
             particle.best_position = particle.position;
             particle.best_fitness  = fitness;
@@ -145,19 +148,13 @@ void ParticleSwarm::update_particles() {
         if (m_particles[i].best_fitness < m_best_fitness) {
             m_best_position = m_particles[i].position;
             m_best_fitness  = m_particles[i].best_fitness;
-            fmt::print("\nBest fit: {}\n", m_best_fitness);
-            // Print the vector
-            fmt::print("\nBest position: ");
-            for (std::size_t j = 0; j < m_number_dimensions; ++j) {
-                fmt::print("{:.3f} ", m_best_position[j]);
-            }
-            fmt::print("\n");
         }
     }
     m_history_best_position.push_back(m_best_position);
 }
 
 void ParticleSwarm::add_partilce_at_barycenter() {
+    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
     Particle particle(m_number_dimensions);
     for (std::size_t i = 0; i < m_number_dimensions; ++i) {
         double sum = 0.0;
@@ -167,7 +164,7 @@ void ParticleSwarm::add_partilce_at_barycenter() {
         particle.position[i] = sum / static_cast<double>(m_number_particles);
     }
     particle.best_position = particle.position;
-    particle.best_fitness  = m_fitness_function(particle.position);
+    particle.best_fitness  = m_fitness_function(particle.position, params);
     m_particles.push_back(particle);
     ++m_number_particles;
 }
@@ -211,6 +208,16 @@ void ParticleSwarm::optimize() {
     }
     std::cout << std::endl;
 }
+
+
+// void ParticleSwarm::asynchronous_optimize() {
+//     this->set_up_export();
+//     initialize_particles();
+//     while (m_current_iteration <= m_max_iterations) {
+
+// }
+
+
 
 void ParticleSwarm::set_up_export() {
     std::cout << "Setting up export... in : " << m_dir_export << std::endl;

@@ -76,7 +76,7 @@ class ParticleSwarm {
     LearningScheme m_cognitive_learning_scheme;
     LearningScheme m_social_learning_scheme;
 
-    std::function<double(const std::vector<double>&)> m_fitness_function;
+    std::function<double(const std::vector<double>&, const std::vector<double>&)> m_fitness_function;
 
     std::random_device                     m_random_device;
     std::mt19937                           m_random_engine;
@@ -89,7 +89,8 @@ class ParticleSwarm {
     ParticleSwarm(std::size_t                                       max_iterations,
                   std::size_t                                       number_particles,
                   std::size_t                                       number_dimensions,
-                  std::function<double(const std::vector<double>&)> fitness_function);
+                  std::function<double(const std::vector<double>&, const std::vector<double>&)> fitness_function);
+                  
     ~ParticleSwarm() = default;
 
     void set_inertia_weight(double inertia_weight) { m_inertia_weight = inertia_weight; }

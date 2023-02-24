@@ -126,5 +126,5 @@ class device {
     double get_brp_at_voltage(double voltage) const;
     double get_depletion_at_voltage(double voltage) const;
 
-    cost_function_result compute_cost_function(double voltage_above_breakdown) const;
+    cost_function_result compute_cost_function(double voltage_above_breakdown, double time) const;
 };
