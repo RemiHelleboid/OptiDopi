@@ -32,6 +32,9 @@ static int IDX_ITER = 0;
 #define DopSmooth 11
 #define NBPOINTS 500
 
+#define DonorMIN 20
+#define DonorMAX 21
+
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     // The x positions are first on a fine grid then on a coarse grid
     double dx_fine        = 0.25;
@@ -76,75 +79,72 @@ void set_up_bounds(double               length_min,
 void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
     std::filesystem::create_directories(dirname);
     std::cout << "Exporting best path to " << dirname << std::endl;
+    double      intrinsic_level  = 1.0e13;
+    double      x_length         = 10.0;
+    std::size_t nb_points        = NBPOINTS;
+    double      intrinsic_length = 0.0;
 
-    double      x_length  = 10.0;
-    std::size_t nb_points = NBPOINTS;
-    // double              donor_length    = 1.0;
-    double intrisic_length = 0.0;
-    // double              donor_level     = 5.0e19;
-    double intrisic_level = 1.0e13;
+    // File to export the best path figures (BV, BrP, DW, ...)
+    std::ofstream best_path_file(dirname + "/SPAD_figures_best_path.csv");
+    best_path_file << "Iteration,BV,BrP,DW,Cost" << std::endl;
 
+    const std::string poisson_dir = fmt::format("{}/poisson_res/", dirname);
+
+#pragma omp parallel for
     for (std::size_t i = 0; i < best_path.size(); ++i) {
-        double              length_don = best_path[i][0];
-        double              level_don  = pow(10, best_path[i][1]);
-        std::vector<double> acceptor_x = x_acceptors(length_don, x_length, N_X);
+        std::cout << "\r" << i << "/" << best_path.size() << std::flush;
+        double              donor_length = best_path[i][0];
+        double              donor_level  = pow(10, best_path[i][1]);
+        std::vector<double> acceptor_x   = x_acceptors(donor_length, x_length, N_X);
         std::vector<double> acceptor_levels(best_path[i].size() - 2);
+        std::vector<double> acceptor_levels_log(best_path[i].begin() + 2, best_path[i].end());
         std::transform(best_path[i].begin() + 2, best_path[i].end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
         device my_device;
-        my_device
-            .set_up_complex_diode(x_length, nb_points, length_don, intrisic_length, level_don, intrisic_level, acceptor_x, acceptor_levels);
+        my_device.set_up_complex_diode(x_length,
+                                       nb_points,
+                                       donor_length,
+                                       intrinsic_length,
+                                       donor_level,
+                                       intrinsic_level,
+                                       acceptor_x,
+                                       acceptor_levels);
         my_device.smooth_doping_profile(DopSmooth);
-        my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
-        // For the last point, we export run the poisson solver and export the potential
-        if (i == best_path.size() - 1) {
-            double       target_anode_voltage  = 30.0;
-            double       tol                   = 1.0e-8;
-            const int    max_iter              = 100;
-            double       voltage_step          = 0.01;
-            double       mcintyre_voltage_step = 0.25;
-            const double stop_above_bv         = 5.0;
-            double       BiasAboveBV           = 3.0;
-            my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
-            std::string poisson_dirname = fmt::format("{}/poisson", dirname);
-            my_device.export_poisson_solution(poisson_dirname, fmt::format("poisson_", i));
 
-            cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
-            double               cost         = cost_resultr.total_cost;
+        // Solve the Poisson and McIntyre equations
+        double       target_anode_voltage  = 30.0;
+        double       tol                   = 1.0e-8;
+        const int    max_iter              = 100;
+        double       voltage_step          = 0.01;
+        double       mcintyre_voltage_step = 0.25;
+        const double stop_above_bv         = 5.0;
+        double       BiasAboveBV           = 3.0;
 
-            double BreakdownVoltage     = my_device.extract_breakdown_voltage(1.0e-6);
-            double BreakdownProbability = my_device.get_brp_at_voltage(BreakdownVoltage + BiasAboveBV);
-            double DepletionWidth       = my_device.get_depletion_at_voltage(BreakdownVoltage + 3.0);
-
-            fmt::print("Breakdown voltage               : {}\n", BreakdownVoltage);
-            fmt::print("Breakdown probability           : {}\n", BreakdownProbability);
-            fmt::print("Depletion width                 : {}\n", DepletionWidth);
-            fmt::print("Cost function                   : {}\n", cost);
+        my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
+        bool poisson_success = my_device.get_poisson_success();
+        if (!poisson_success) {
+            fmt::print("Poisson failed\n");
         }
+        cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV);
+        double               BV          = cost_result.result.BV;
+        double               BRP         = cost_result.result.BrP;
+        double               DW          = cost_result.result.DW;
+        double               cost        = cost_result.total_cost;
+        fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
+
+        my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+        my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
     }
 }
 
 double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels) {
-    // Create a complexe pin diode.
-    double      x_length        = 10.0;
-    std::size_t nb_points       = NBPOINTS;
-    double      ddonor_length   = 1.0;
-    double      intrisic_length = 0.0;
-
-    double donor_level    = pow(10, log_donor_level);
-    double intrisic_level = 1.0e13;
-
-    // std::vector<double> acceptor_x = utils::linspace(donor_length + intrisic_length, x_length, N_X);
-    double              dx_fine    = 0.20;
-    double              dx_neutral = 0.50;
-    double              dx_coarse  = 2.0;
-    std::vector<double> acceptor_x = x_acceptors(donor_length, x_length, N_X);
-    // Print the acceptor x vector
-    // fmt::print("acceptor_x = {}\n", acceptor_x);
-    // std::cout << "Size of acceptor_x = " << acceptor_x.size() << std::endl;
+    double              x_length         = 10.0;
+    std::size_t         nb_points        = NBPOINTS;
+    double              intrinsic_length = 0.0;
+    double              donor_level      = pow(10, log_donor_level);
+    double              intrinsic_level  = 1.0e13;
+    std::vector<double> acceptor_x       = x_acceptors(donor_length, x_length, N_X);
     std::vector<double> acceptor_levels(log_acceptor_levels.size());
-    // Take the power 10 of the acceptor levels
     std::transform(log_acceptor_levels.begin(), log_acceptor_levels.end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
-    // Check if the size of the vector is the same
     if (acceptor_levels.size() != acceptor_x.size()) {
         fmt::print("Error: the size of the acceptor_levels vector is not the same as the acceptor_x vector.\n");
         exit(1);
@@ -152,10 +152,10 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
     device my_device;
     my_device.set_up_complex_diode(x_length,
                                    nb_points,
-                                   ddonor_length,
-                                   intrisic_length,
+                                   donor_length,
+                                   intrinsic_length,
                                    donor_level,
-                                   intrisic_level,
+                                   intrinsic_level,
                                    acceptor_x,
                                    acceptor_levels);
     my_device.smooth_doping_profile(DopSmooth);
@@ -175,11 +175,11 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
         return BIG_DOUBLE;
     }
 
-    cost_function_result cost_resultr = my_device.compute_cost_function(BiasAboveBV);
-    double               BV           = cost_resultr.result.BV;
-    double               BRP          = cost_resultr.result.BrP;
-    double               DW           = cost_resultr.result.DW;
-    double               cost         = cost_resultr.total_cost;
+    cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV);
+    double               BV          = cost_result.result.BV;
+    double               BRP         = cost_result.result.BrP;
+    double               DW          = cost_result.result.DW;
+    double               cost        = cost_result.total_cost;
 
     // fmt::print("BV: {:.2f}, BRP: {:.2f}, DW: {:.2e}, Cost: {:.2f}\n", BV, BRP, DW, cost);
     return cost;
@@ -223,8 +223,8 @@ void MainParticleSwarmSPAD() {
     double              max_length_donor = 0.50001;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
-    double              donor_min_doping = 16.0;
-    double              donor_max_doping = 20.0;
+    double              donor_min_doping = DonorMIN;
+    double              donor_max_doping = DonorMAX;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
     set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
@@ -234,12 +234,12 @@ void MainParticleSwarmSPAD() {
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t max_iter         = 20;
-    double      c1               = 2.0;
-    double      c2               = 2.0;
+    std::size_t max_iter         = 150;
+    double      c1               = 3.0;
+    double      c2               = 1.0;
     double      w                = 0.9;
     double      velocity_scaling = 0.2;
-    std::size_t nb_particles     = 10 * nb_threads;
+    std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function);
     pso.set_dir_export(DIR_RES);
@@ -276,14 +276,14 @@ void MainSimulatedAnnealingSPAD() {
     double          final_temp       = 0.01;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-    double          cooling_factor   = 0.98;
+    double          cooling_factor   = 0.95;
     // Boundaries setup
     double              min_length_donor = 0.5;
     double              max_length_donor = 0.50001;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
-    double              donor_min_doping = 19.0;
-    double              donor_max_doping = 20.0;
+    double              donor_min_doping = DonorMIN;
+    double              donor_max_doping = DonorMAX;
     std::vector<double> min_values(nb_parameters);
     std::vector<double> max_values(nb_parameters);
     set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
@@ -292,14 +292,15 @@ void MainSimulatedAnnealingSPAD() {
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
+    std::size_t nb_doe = 4;
+    std::cout << "Number DOE: " << nb_doe << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
-    std::vector<std::vector<double>> initial_solutions(nb_threads);
-    std::vector<std::vector<double>> final_solutions(nb_threads);
-    std::vector<double>              final_costs(nb_threads);
+    std::vector<std::vector<double>> initial_solutions(nb_doe);
+    std::vector<std::vector<double>> final_solutions(nb_doe);
+    std::vector<double>              final_costs(nb_doe);
 
-    std::vector<SimulatedAnnealHistory> histories(nb_threads);
+    std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
-    std::size_t nb_doe = nb_threads;
 #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
     for (int i = 0; i < nb_doe; i++) {
         std::string directory = fmt::format("{}/thread_{}/", DIR_RES, i);
@@ -336,7 +337,7 @@ void MainSimulatedAnnealingSPAD() {
 
     // Copy the folder with the best solution into best_path_index
     std::string best_path_file = fmt::format("{}/thread_{}/history_optimization.csv", DIR_RES, index);
-    std::string new_path       = fmt::format("{}/best_path_{}/", DIR_RES, index);
+    std::string new_path       = fmt::format("{}/BEST/", DIR_RES, index);
     std::filesystem::create_directory(new_path);
     std::filesystem::copy(best_path_file, DIR_RES, std::filesystem::copy_options::recursive);
 

@@ -240,8 +240,9 @@ double device::get_depletion_at_voltage(double voltage) const {
 cost_function_result device::compute_cost_function(double voltage_above_breakdown) const {
     const double alpha_BV                     = 20.0;
     const double alpha_BP                     = 5.0;
-    const double alpha_DW                     = 50.0;
-    const double alpha_tot_acceptor           = 1.0e-3;
+    const double alpha_DW                     = 500.0;
+    const double alpha_tot_acceptor           = 1.0;
+    double BV_TOL = 2;
     auto         total_acceptor_concentration = m_doping_profile.get_acceptor_concentration();
     double integral_acceptor_concentration = std::accumulate(total_acceptor_concentration.begin(), total_acceptor_concentration.end(), 0.0);
     integral_acceptor_concentration /= total_acceptor_concentration.size();
@@ -252,10 +253,14 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
     double DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage + voltage_above_breakdown);
-    double BV_cost              = alpha_BV * std::pow(fabs((BreakdownVoltage - BV_Target)), 8);
+    double BV_cost              = alpha_BV * std::pow(fabs((BreakdownVoltage - BV_Target)/BV_TOL), 8);
     double BP_cost              = -alpha_BP * BreakdownProbability;
     double meter_to_micron      = 1.0e6;
     double DW_cost              = -alpha_DW * (DepletionWidth / m_doping_profile.get_x_line().back()) * meter_to_micron;
+    // std::cout << "DW: " << DepletionWidth << " --> COST: " << DW_cost << std::endl;
+    // std::cout << "DW: " << (m_doping_profile.get_x_line().back()) << std::endl;
+    // std::cout << "BV: " << BreakdownVoltage << " --> COST: " << BV_cost << std::endl;
+
     if (std::isnan(BV_cost)) {
         BV_cost = 1.0e6;
     }

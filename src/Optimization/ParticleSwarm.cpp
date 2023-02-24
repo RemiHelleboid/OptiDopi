@@ -13,6 +13,9 @@
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <fmt/ranges.h>
+#include <fmt/xchar.h>
+
 
 #include <filesystem>
 #include <fstream>
@@ -142,6 +145,13 @@ void ParticleSwarm::update_particles() {
         if (m_particles[i].best_fitness < m_best_fitness) {
             m_best_position = m_particles[i].position;
             m_best_fitness  = m_particles[i].best_fitness;
+            fmt::print("\nBest fit: {}\n", m_best_fitness);
+            // Print the vector
+            fmt::print("\nBest position: ");
+            for (std::size_t j = 0; j < m_number_dimensions; ++j) {
+                fmt::print("{:.3f} ", m_best_position[j]);
+            }
+            fmt::print("\n");
         }
     }
     m_history_best_position.push_back(m_best_position);
