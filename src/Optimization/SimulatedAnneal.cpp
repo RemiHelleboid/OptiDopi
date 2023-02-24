@@ -100,7 +100,7 @@ std::vector<double> SimulatedAnnealing::neighbour_function() {
 
     for (std::size_t i = 0; i < m_nb_variables; ++i) {
         double range = m_bounds[i].second - m_bounds[i].first;
-        new_solution[i] += distribution_(m_generator) * range * 1;
+        new_solution[i] += distribution_(m_generator) * range * 1 * factor;
     }
     return clip_variables(new_solution);
 }

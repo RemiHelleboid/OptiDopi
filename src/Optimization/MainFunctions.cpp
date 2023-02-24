@@ -130,7 +130,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         double               DW          = cost_result.result.DW;
         double               cost        = cost_result.total_cost;
         fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
-
+#pragma omp critical
         my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
         my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
     }
