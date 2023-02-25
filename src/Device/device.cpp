@@ -233,8 +233,8 @@ double sigmoid(double x) {
 
 cost_function_result device::compute_cost_function(double voltage_above_breakdown, double time) const {
     const double alpha_BV                     = 20.0;
-    const double alpha_BP                     = 2.0;
-    const double alpha_DW                     = 20.0;
+    const double alpha_BP                     = 5.0;
+    const double alpha_DW                     = 200.0;
     const double alpha_tot_acceptor           = 1.0e-6;
     double       BV_TOL                       = 2.0;
     auto         total_acceptor_concentration = m_doping_profile.get_acceptor_concentration();
@@ -246,7 +246,7 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     double BV_Target            = 20.0;
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
-    double DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage + voltage_above_breakdown);
+    double DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage);
     double BV_cost              = alpha_BV * std::pow(fabs((BreakdownVoltage - BV_Target) / BV_TOL), 10);
     double BP_cost              = -alpha_BP * BreakdownProbability;
     double meter_to_micron      = 1.0e6;
@@ -258,10 +258,10 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     if (std::isnan(BV_cost)) {
         BV_cost = 1.0e6;
     }
-    double      cost = BV_cost + BP_cost + DW_cost + total_acceptor_obj;
+    double      cost = BV_cost + BP_cost + DW_cost;
     // Renormalize the cost function by arctan
     double total_weight = alpha_BP + alpha_DW;
-    cost = 10.0 * cost / total_weight;
+    cost = 100.0 * cost;
 
     result_simu result;
     result.BV  = BreakdownVoltage;

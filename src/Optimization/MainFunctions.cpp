@@ -28,10 +28,10 @@ namespace Optimization {
 
 static int IDX_ITER = 0;
 
-#define N_X 11
+#define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 500
-#define ITER_MAX 1000
+#define ITER_MAX 200
 
 #define DonorMIN 18
 #define DonorMAX 21
@@ -114,7 +114,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         my_device.smooth_doping_profile(DopSmooth);
 
         // Solve the Poisson and McIntyre equations
-        double       target_anode_voltage  = 40.0;
+        double       target_anode_voltage  = 30.0;
         double       tol                   = 1.0e-8;
         const int    max_iter              = 1000;
         double       voltage_step          = 0.01;
@@ -172,7 +172,7 @@ double intermediate_cost_function(double              donor_length,
                                    acceptor_levels);
     my_device.smooth_doping_profile(DopSmooth);
 
-    double       target_anode_voltage  = 40.0;
+    double       target_anode_voltage  = 30.0;
     double       tol                   = 1.0e-8;
     const int    max_iter              = 1000;
     double       voltage_step          = 0.01;
@@ -236,7 +236,7 @@ void MainParticleSwarmSPAD() {
     std::size_t nb_parameters = N_X + 2;
     // Boundaries setup
     // Boundaries setup
-    double              min_length_donor = 0.1;
+    double              min_length_donor = 0.99;
     double              max_length_donor = 1.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
@@ -252,11 +252,11 @@ void MainParticleSwarmSPAD() {
     std::cout << "Number threads: " << nb_threads << std::endl;
 
     std::size_t max_iter         = ITER_MAX;
-    double      c1               = 3.0;
-    double      c2               = 1.20;
-    double      w                = 0.95;
-    double      velocity_scaling = 1.0;
-    std::size_t nb_particles     = 1 * nb_threads;
+    double      c1               = 2.5;
+    double      c2               = 1.5;
+    double      w                = 0.9;
+    double      velocity_scaling = 0.1;
+    std::size_t nb_particles     = 2 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
     pso.set_dir_export(DIR_RES);
