@@ -59,14 +59,26 @@ void device::solve_poisson(const double final_anode_voltage, const double tolera
     m_list_poisson_solutions = m_poisson_solver.get_list_poisson_solutions();
 }
 
+void device::export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const {
+    std::size_t freq_voltage = voltage_step / ((m_list_voltages.back() - m_list_voltages.front()) / m_list_voltages.size());
+    if (freq_voltage < 1) {
+        freq_voltage = 1;
+    }
+        std::filesystem::create_directories(directory_name);
+    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage+=freq_voltage) {
+        const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
+        m_list_poisson_solutions[idx_voltage].export_to_file(filename);
+    }
+}
+
+
+
 void device::export_poisson_solution(const std::string& directory_name, const std::string& prefix) const {
-    std::cout << "Exporting the poisson solution to the directory " << directory_name << std::endl;
     std::filesystem::create_directories(directory_name);
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
         const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
         m_list_poisson_solutions[idx_voltage].export_to_file(filename);
     }
-    std::cout << "Exporting the poisson solution to the directory " << directory_name << " done." << std::endl;
 }
 
 void device::export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const {
@@ -155,29 +167,7 @@ std::vector<double> device::get_list_total_breakdown_probability() const {
     return list_total_breakdown_probability;
 }
 
-// double device::extract_breakdown_voltage(double brp_threshold) const {
-//     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
-//     auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double&
-//     voltage) {
-//         return voltage > brp_threshold;
-//     });
-//     if (it_bv == list_total_breakdown_probability.end()) {
-//         std::cout << "NaN BV" << std::endl;
-//         return std::numeric_limits<double>::quiet_NaN();
-//     }
-//     return m_list_mcintyre_voltages[std::distance(list_total_breakdown_probability.begin(), it_bv)];
-// }
 
-// double device::extract_breakdown_voltage(double brp_threshold) const {
-//     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
-//     for (std::size_t idx_voltage = 0; idx_voltage < list_total_breakdown_probability.size(); ++idx_voltage) {
-//         if (list_total_breakdown_probability[idx_voltage] > brp_threshold) {
-//             return m_list_mcintyre_voltages[idx_voltage];
-//         }
-//     }
-//     std::cout << "NaN BV" << std::endl;
-//     return std::numeric_limits<double>::quiet_NaN();
-// }
 
 double device::extract_breakdown_voltage(double brp_threshold) const {
     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();

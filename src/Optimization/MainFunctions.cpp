@@ -31,7 +31,7 @@ static int IDX_ITER = 0;
 #define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 400
-#define ITER_MAX 50
+#define ITER_MAX 400
 
 #define DonorMIN 18
 #define DonorMAX 21
@@ -80,10 +80,11 @@ void set_up_bounds(double               length_min,
 void export_best_path(std::vector<std::vector<double>> best_path, std::string dirname) {
     std::filesystem::create_directories(dirname);
     std::cout << "Exporting best path to " << dirname << std::endl;
-    double      intrinsic_level  = 1.0e13;
-    double      x_length         = 10.0;
-    std::size_t nb_points        = NBPOINTS;
-    double      intrinsic_length = 0.0;
+    double      intrinsic_level     = 1.0e13;
+    double      x_length            = 10.0;
+    std::size_t nb_points           = NBPOINTS;
+    double      intrinsic_length    = 0.0;
+    double      voltage_step_export = 0.5;
 
     // File to export the best path figures (BV, BrP, DW, ...)
     std::ofstream best_path_file(dirname + "/SPAD_figures_best_path.csv");
@@ -125,7 +126,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         if (!poisson_success) {
             fmt::print("Poisson failed\n");
         }
-        double time = i / static_cast<double>(best_path.size());
+        double               time        = i / static_cast<double>(best_path.size());
         cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
         double               BV          = cost_result.result.BV;
         double               BRP         = cost_result.result.BrP;
@@ -133,17 +134,20 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         double               cost        = cost_result.total_cost;
         fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
 #pragma omp critical
-{
-        my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
-        // my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
-        const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
-        std::filesystem::create_directories(poisson_dir_iter);
-        my_device.export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i));
-}
+        {
+            my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+            // my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
+            const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
+            std::filesystem::create_directories(poisson_dir_iter);
+            my_device.export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i), voltage_step_export);
+        }
     }
 }
 
-double intermediate_cost_function(double donor_length, double log_donor_level, std::vector<double> log_acceptor_levels, std::vector<double> parameters) {
+double intermediate_cost_function(double              donor_length,
+                                  double              log_donor_level,
+                                  std::vector<double> log_acceptor_levels,
+                                  std::vector<double> parameters) {
     double              x_length         = 10.0;
     std::size_t         nb_points        = NBPOINTS;
     double              intrinsic_length = 0.0;
@@ -181,9 +185,9 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
         // fmt::print("Poisson failed\n");
         return BIG_DOUBLE;
     }
-    std::size_t iter_nb = parameters[0];
-    std::size_t max_iter_nb = parameters[1];
-    double time = parameters[0] / static_cast<double>(parameters[1]);
+    std::size_t          iter_nb     = parameters[0];
+    std::size_t          max_iter_nb = parameters[1];
+    double               time        = parameters[0] / static_cast<double>(parameters[1]);
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
     double               BV          = cost_result.result.BV;
     double               BRP         = cost_result.result.BrP;
@@ -248,9 +252,9 @@ void MainParticleSwarmSPAD() {
 
     std::size_t max_iter         = ITER_MAX;
     double      c1               = 3.0;
-    double      c2               = 1.0;
-    double      w                = 0.9;
-    double      velocity_scaling = 0.2;
+    double      c2               = 1.20;
+    double      w                = 0.95;
+    double      velocity_scaling = 0.1;
     std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
