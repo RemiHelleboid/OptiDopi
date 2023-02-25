@@ -31,7 +31,7 @@ static int IDX_ITER = 0;
 #define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 400
-#define ITER_MAX 300
+#define ITER_MAX 100
 
 #define DonorMIN 18
 #define DonorMAX 21
@@ -247,7 +247,7 @@ void MainParticleSwarmSPAD() {
     double      c1               = 3.0;
     double      c2               = 1.0;
     double      w                = 0.9;
-    double      velocity_scaling = 0.1;
+    double      velocity_scaling = 0.2;
     std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
