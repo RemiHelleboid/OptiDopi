@@ -240,9 +240,9 @@ double device::get_depletion_at_voltage(double voltage) const {
 cost_function_result device::compute_cost_function(double voltage_above_breakdown, double time) const {
     const double alpha_BV                     = 20.0;
     const double alpha_BP                     = 10.0;
-    const double alpha_DW                     = 200.0;
-    const double alpha_tot_acceptor           = 1.0;
-    double       BV_TOL                       = 3.0;
+    const double alpha_DW                     = 100.0;
+    const double alpha_tot_acceptor           = 1.0e-6;
+    double       BV_TOL                       = 2.0;
     auto         total_acceptor_concentration = m_doping_profile.get_acceptor_concentration();
     double integral_acceptor_concentration = std::accumulate(total_acceptor_concentration.begin(), total_acceptor_concentration.end(), 0.0);
     integral_acceptor_concentration /= total_acceptor_concentration.size();

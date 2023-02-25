@@ -30,9 +30,10 @@ static int IDX_ITER = 0;
 
 #define N_X 8
 #define DopSmooth 11
-#define NBPOINTS 500
+#define NBPOINTS 400
+#define ITER_MAX 300
 
-#define DonorMIN 20
+#define DonorMIN 18
 #define DonorMAX 21
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
@@ -90,7 +91,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 
     const std::string poisson_dir = fmt::format("{}/poisson_res/", dirname);
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for (std::size_t i = 0; i < best_path.size(); ++i) {
         std::cout << "\r" << i << "/" << best_path.size() << std::flush;
         double              donor_length = best_path[i][0];
@@ -132,8 +133,10 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         double               cost        = cost_result.total_cost;
         fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
 #pragma omp critical
+{
         my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
         my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
+}
     }
 }
 
@@ -225,8 +228,8 @@ void MainParticleSwarmSPAD() {
     std::size_t nb_parameters = N_X + 2;
     // Boundaries setup
     // Boundaries setup
-    double              min_length_donor = 0.5;
-    double              max_length_donor = 0.50001;
+    double              min_length_donor = 0.1;
+    double              max_length_donor = 2.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
@@ -240,7 +243,7 @@ void MainParticleSwarmSPAD() {
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
-    std::size_t max_iter         = 150;
+    std::size_t max_iter         = ITER_MAX;
     double      c1               = 3.0;
     double      c2               = 1.0;
     double      w                = 0.9;
@@ -277,15 +280,15 @@ void MainSimulatedAnnealingSPAD() {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = 1000;
+    std::size_t     max_iter         = ITER_MAX;
     double          initial_temp     = 10;
     double          final_temp       = 0.005;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-    double          cooling_factor   = 0.95;
+    double          cooling_factor   = 0.97;
     // Boundaries setup
-    double              min_length_donor = 0.5;
-    double              max_length_donor = 0.50001;
+    double              min_length_donor = 0.1;
+    double              max_length_donor = 2.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
@@ -298,7 +301,7 @@ void MainSimulatedAnnealingSPAD() {
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
-    std::size_t nb_doe = 8;
+    std::size_t nb_doe = nb_threads;
     std::cout << "Number DOE: " << nb_doe << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_doe);

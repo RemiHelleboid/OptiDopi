@@ -118,7 +118,8 @@ void SimulatedAnnealing::run() {
 
     std::size_t nb_iter_with_change         = 0;
     std::size_t nb_iter_without_improvement = 0;
-    while (m_current_iteration < m_max_iterations && m_temperature > m_final_temperature) {
+    while (m_current_iteration < m_max_iterations) {
+    // while (m_current_iteration < m_max_iterations && m_temperature > m_final_temperature) {
         std::vector<double> new_solution = neighbour_function();
         double              new_cost     = m_cost_function(new_solution, params);
         if (new_cost < m_current_cost) {
