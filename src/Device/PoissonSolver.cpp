@@ -384,6 +384,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_v
     m_mcintyre_solver.set_xline(x_line_micron);
     double tol               = 1e-6;
     double breakdown_voltage = 0.0;
+    const double EF_Threshold = 3.0e5;
 
     m_solver.analyzePattern(m_matrix);
 

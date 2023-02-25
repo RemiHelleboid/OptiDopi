@@ -31,7 +31,7 @@ static int IDX_ITER = 0;
 #define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 400
-#define ITER_MAX 100
+#define ITER_MAX 50
 
 #define DonorMIN 18
 #define DonorMAX 21
@@ -135,7 +135,10 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 #pragma omp critical
 {
         my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
-        my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
+        // my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
+        const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
+        std::filesystem::create_directories(poisson_dir_iter);
+        my_device.export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i));
 }
     }
 }

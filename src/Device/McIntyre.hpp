@@ -80,6 +80,7 @@ class McIntyre {
     void set_xline(std::vector<double> x_line);
     void set_xline(const Eigen::VectorXd& x_line);
     void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess = true, double conv_factor = 1.0);
+    double get_max_electric_field() const;
 
     double                      dPe_func(double Pe, double Ph, int index);
     double                      dPh_func(double Pe, double Ph, int index);

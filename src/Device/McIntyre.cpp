@@ -68,8 +68,8 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
-    // m_electric_field = electric_field;
-    m_electric_field = Utils::convol_square(electric_field, 5);
+    m_electric_field = electric_field;
+    // m_electric_field = Utils::convol_square(electric_field, 5);
     std::transform(m_electric_field.begin(), m_electric_field.end(), m_electric_field.begin(), [conv_factor](double x) {
         return x * conv_factor;
     });
@@ -88,6 +88,8 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         this->initial_guess();
     }
 }
+
+double McIntyre::get_max_electric_field() const { return *std::max_element(m_electric_field.begin(), m_electric_field.end()); }
 
 /*! \brief Computes the derivate of Pe over the x variable.
  *  The formula is given by the McIntyre model.
@@ -219,8 +221,22 @@ void McIntyre::initial_guess(double eBrP, double hBrP) {
  *
  *  \return std::vector<double> The computed solution of the system. */
 void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
-    auto            start  = std::chrono::high_resolution_clock::now();
-    std::size_t     N      = m_xline.size();
+    auto             start             = std::chrono::high_resolution_clock::now();
+    std::size_t      N                 = m_xline.size();
+    constexpr double MaxFieldThreshold = 30.0;  // [V/um]
+    // std::cout << "Max electric field: " << get_max_electric_field() << "V/um" << std::endl;
+    // If the maximum of the electric field is lower than the threshold, the solution is 0.0
+    if (get_max_electric_field() < MaxFieldThreshold) {
+        mSolverHasConverged = true;
+        m_total_number_sim++;
+        m_converged_sim++;
+        mBreakdownP                 = Eigen::VectorXd::Zero(2 * N);
+        m_eBreakdownProbability     = std::vector<double>(N, 0.0);
+        m_hBreakdownProbability     = std::vector<double>(N, 0.0);
+        m_totalBreakdownProbability = std::vector<double>(N, 0.0);
+        return;
+    }
+
     double          Norm_w = 1e10;
     int             epoch  = 0;
     Eigen::VectorXd W(2 * N);

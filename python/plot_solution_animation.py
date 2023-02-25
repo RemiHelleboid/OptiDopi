@@ -19,7 +19,7 @@ def animation_sol(DIR):
     # Extract the voltage from the file name by using regular expression
     for file in list_files:
         voltage = re.findall(r"[-+]?\d*\.\d+|\d+", file)
-        list_voltage.append(float(voltage[0]))
+        list_voltage.append(float(voltage[-1]))
     list_voltage = np.array(list_voltage)
     # Sort the list of files according to the voltage
     list_files = [x for _, x in sorted(zip(list_voltage, list_files))]
