@@ -95,7 +95,9 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     if (list_x_acceptor.size() != list_acceptor_level.size()) {
         throw std::logic_error("Error: Acceptor and donor profile have different numbers of values. Cannot compute the total doping.");
     }
-    if (list_x_acceptor.back() > xlength + 1e-6) {
+    if (list_x_acceptor.back() > xlength + 1e-9) {
+        std::cout << "X LENGTH       : " << xlength << std::endl;
+        std::cout << "LAST X ACCEPTOR: " << list_x_acceptor.back() << std::endl;
         throw std::logic_error("Last acceptor position is larger than the total length of the device.");
     }
     m_x_line = utils::linspace(0.0, xlength, number_points);

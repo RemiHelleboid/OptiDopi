@@ -28,18 +28,18 @@ namespace Optimization {
 
 static int IDX_ITER = 0;
 
-#define N_X 8
+#define N_X 11
 #define DopSmooth 11
-#define NBPOINTS 400
-#define ITER_MAX 400
+#define NBPOINTS 500
+#define ITER_MAX 1000
 
 #define DonorMIN 18
 #define DonorMAX 21
 
 std::vector<double> x_acceptors(double length_donor, double total_length, std::size_t nb_points_acceptor) {
     // The x positions are first on a fine grid then on a coarse grid
-    double dx_fine        = 0.25;
-    double size_fine_area = 1.5;
+    double dx_fine        = 0.3;
+    double size_fine_area = 2.0;
 
     std::vector<double> x_acceptor(nb_points_acceptor);
     x_acceptor[0] = length_donor;
@@ -51,10 +51,11 @@ std::vector<double> x_acceptors(double length_donor, double total_length, std::s
         ++i;
     }
     double dx_coarse = (total_length - length_donor - size_fine_area) / (nb_points_acceptor - i);
-    while (i < nb_points_acceptor) {
+    while (i < nb_points_acceptor && x_acceptor[i - 1] + dx_coarse <= total_length) {
         x_acceptor[i] = x_acceptor[i - 1] + dx_coarse;
         ++i;
     }
+    x_acceptor[x_acceptor.size() - 1] = total_length;
     return x_acceptor;
 }
 
@@ -115,7 +116,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         // Solve the Poisson and McIntyre equations
         double       target_anode_voltage  = 40.0;
         double       tol                   = 1.0e-8;
-        const int    max_iter              = 100;
+        const int    max_iter              = 1000;
         double       voltage_step          = 0.01;
         double       mcintyre_voltage_step = 0.25;
         const double stop_above_bv         = 5.0;
@@ -173,7 +174,7 @@ double intermediate_cost_function(double              donor_length,
 
     double       target_anode_voltage  = 40.0;
     double       tol                   = 1.0e-8;
-    const int    max_iter              = 100;
+    const int    max_iter              = 1000;
     double       voltage_step          = 0.01;
     double       mcintyre_voltage_step = 0.25;
     const double stop_above_bv         = 5.0;
@@ -236,7 +237,7 @@ void MainParticleSwarmSPAD() {
     // Boundaries setup
     // Boundaries setup
     double              min_length_donor = 0.1;
-    double              max_length_donor = 2.0;
+    double              max_length_donor = 1.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
@@ -254,7 +255,7 @@ void MainParticleSwarmSPAD() {
     double      c1               = 3.0;
     double      c2               = 1.20;
     double      w                = 0.95;
-    double      velocity_scaling = 0.1;
+    double      velocity_scaling = 1.0;
     std::size_t nb_particles     = 1 * nb_threads;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
@@ -292,10 +293,10 @@ void MainSimulatedAnnealingSPAD() {
     double          final_temp       = 0.005;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-    double          cooling_factor   = 0.97;
+    double          cooling_factor   = 0.99;
     // Boundaries setup
     double              min_length_donor = 0.1;
-    double              max_length_donor = 2.0;
+    double              max_length_donor = 1.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
