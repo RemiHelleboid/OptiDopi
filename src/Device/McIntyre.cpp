@@ -33,23 +33,6 @@ McIntyre::McIntyre(std::vector<double> x_line, double temperature) : m_temperatu
     }
 }
 
-// McIntyre::McIntyre(std::vector<double> x_line, std::vector<double> electric_field, double temperature) : m_temperature(temperature) {
-//     m_xline                  = x_line;
-//     m_electric_field         = electric_field;
-//     mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
-//     m_InitialGuessBreakdownP = Eigen::VectorXd::Zero(2 * m_xline.size());
-//     mSolverHasConverged      = false;
-//     m_eRateImpactIonization.resize(m_xline.size());
-//     m_hRateImpactIonization.resize(m_xline.size());
-//     const double Gamma = compute_gamma(m_temperature);
-//     const double E_g   = compute_band_gap(m_temperature);
-//     for (std::size_t idx_x = 0; idx_x < m_xline.size(); idx_x++) {
-//         m_eRateImpactIonization[idx_x] = alpha_DeMan(m_electric_field[idx_x], Gamma, E_g);
-//         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
-//     }
-//     this->initial_guess();
-// }
-
 void McIntyre::set_xline(std::vector<double> x_line) {
     m_xline                  = x_line;
     mBreakdownP              = Eigen::VectorXd::Zero(2 * m_xline.size());
@@ -83,7 +66,7 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
         m_hRateImpactIonization[idx_x] = beta_DeMan(m_electric_field[idx_x], Gamma, E_g);
     }
     double total_brp = mBreakdownP.norm();
-    if (!mSolverHasConverged || total_brp <= 0.7) {
+    if (!mSolverHasConverged || total_brp <= 0.8) {
         // std::cout << "Recomputing initial guess" << std::endl;
         this->initial_guess();
     }
@@ -200,12 +183,12 @@ Eigen::VectorXd McIntyre::assembleSecondMemberNewton() {
 void McIntyre::initial_guess(double eBrP, double hBrP) {
     int                 NbPoints                      = m_xline.size();
     auto                index_max_electric_field      = std::max_element(m_electric_field.begin(), m_electric_field.end());
-    double              length_peack_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
+    double              length_peak_triggering_force = m_xline[std::distance(m_electric_field.begin(), index_max_electric_field)];
     std::vector<double> eInitialBrP(NbPoints);
     std::vector<double> hInitialBrP(NbPoints);
     for (int i = 0; i < NbPoints; i++) {
-        eInitialBrP[i] = eBrP * (m_xline[i] >= length_peack_triggering_force);
-        hInitialBrP[i] = hBrP * (m_xline[i] < length_peack_triggering_force);
+        eInitialBrP[i] = eBrP * (m_xline[i] >= length_peak_triggering_force);
+        hInitialBrP[i] = hBrP * (m_xline[i] < length_peak_triggering_force);
     }
     // Smooth the initial guess
     eInitialBrP = Utils::convol_square(eInitialBrP, 5);
@@ -249,9 +232,6 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     int                              MaxEpoch = 2500;
     double                           factor   = 1.0;
     double                           lambda   = 1.0;
-    std::random_device               rd;
-    std::mt19937                     gen(rd());
-    std::uniform_real_distribution<> dis(-0.05, 0.05);
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         double lambda = 1.0;
         MAT           = assembleMat();
@@ -259,13 +239,9 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         EigenSolver.factorize(MAT);
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
-            factor              = factor * 1.05;
-            double random_e     = dis(gen);
-            initial_guess(1.0 + random_e, 1.0 + 0.99 * random_e);
+            factor              = factor * 0.95;
+            initial_guess(factor * 0.8, factor * 0.4);
             mBreakdownP = m_InitialGuessBreakdownP;
-            // std::cerr << "Inter error\n";
-            // std::cout << "NO CONVERGENCE OF MCINTYRE DURING COMPUTE, NB EPOCH = " << epoch << std::endl;
-            // lambda *= 0.5;
             epoch++;
         } else {
             W           = EigenSolver.solve(B);
