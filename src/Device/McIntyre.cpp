@@ -291,4 +291,12 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     m_McIntyre_time += elapsed_seconds.count();
 }
 
+double McIntyre::get_mean_total_breakdown_probability() const {
+    double mean = 0.0;
+    for (auto& p : m_totalBreakdownProbability) {
+        mean += p;
+    }
+    return mean / m_totalBreakdownProbability.size();
+}
+
 }  // namespace mcintyre
