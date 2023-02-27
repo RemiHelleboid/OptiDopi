@@ -26,8 +26,6 @@ namespace Optimization {
 #define NAN_DOUBLE std::numeric_limits<double>::quiet_NaN()
 #define BIG_DOUBLE 1.0e10
 
-static int IDX_ITER = 0;
-
 #define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 500
@@ -118,7 +116,6 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         double       target_anode_voltage  = 30.0;
         double       tol                   = 1.0e-8;
         const int    max_iter              = 1000;
-        double       voltage_step          = 0.01;
         double       mcintyre_voltage_step = 0.25;
         const double stop_above_bv         = 5.0;
         double       BiasAboveBV           = 3.0;
@@ -176,7 +173,6 @@ double intermediate_cost_function(double              donor_length,
     double       target_anode_voltage  = 30.0;
     double       tol                   = 1.0e-8;
     const int    max_iter              = 1000;
-    double       voltage_step          = 0.01;
     double       mcintyre_voltage_step = 0.25;
     const double stop_above_bv         = 5.0;
     double       BiasAboveBV           = 3.0;
@@ -189,14 +185,15 @@ double intermediate_cost_function(double              donor_length,
     }
     std::size_t          iter_nb     = parameters[0];
     std::size_t          max_iter_nb = parameters[1];
-    double               time        = parameters[0] / static_cast<double>(parameters[1]);
+    double               time        = iter_nb / static_cast<double>(max_iter_nb);
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
-    double               BV          = cost_result.result.BV;
-    double               BRP         = cost_result.result.BrP;
-    double               DW          = cost_result.result.DW;
-    double               cost        = cost_result.total_cost;
 
+    // double               BV          = cost_result.result.BV;
+    // double               BRP         = cost_result.result.BrP;
+    // double               DW          = cost_result.result.DW;
+    double               cost        = cost_result.total_cost;
     // fmt::print("BV: {:.2f}, BRP: {:.2f}, DW: {:.2e}, Cost: {:.2f}\n", BV, BRP, DW, cost);
+
     return cost;
 }
 
@@ -320,7 +317,7 @@ void MainSimulatedAnnealingSPAD() {
     std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
 #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
-    for (int i = 0; i < nb_doe; i++) {
+    for (std::size_t i = 0; i < nb_doe; i++) {
         std::string directory = fmt::format("{}/thread_{}/", DIR_RES, i);
         std::filesystem::create_directory(directory);
         SimulatedAnnealing  sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function_wrapper);

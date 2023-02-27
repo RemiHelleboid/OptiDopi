@@ -47,6 +47,7 @@ class NewtonPoissonSolver {
  private:
     Eigen::VectorXd              m_x_line;
     Eigen::VectorXd              m_doping_concentration;
+    std::size_t                  m_number_points;
     const double                 m_temperature                     = 300.0;
     const double                 m_thermal_voltage                 = boltzmann_constant_eV * m_temperature;
     const double                 m_intrisinc_carrier_concentration = 1.1e16;
@@ -82,7 +83,7 @@ class NewtonPoissonSolver {
     void compute_electron_density(const double applied_voltage);
     void compute_hole_density(const double applied_voltage);
     void compute_total_charge(const double cathode_voltage, const double anode_voltage);
-    void compute_derivative_total_charge(const double cathode_voltage, const double anode_voltage);
+    void compute_derivative_total_charge();
 
     void compute_initial_guess();
 
@@ -91,14 +92,14 @@ class NewtonPoissonSolver {
     void   update_matrix();
     void   compute_right_hand_side();
 
-    void newton_solver(const double final_anode_voltage, const double tolerance, const int max_iterations, double voltage_step);
-    void newton_solver_with_mcintyre(const double final_anode_voltage,
-                                     const double tolerance,
-                                     const int    max_iterations,
-                                     double       voltage_step,
-                                     const double step_voltage_mcintyre,
-                                     bool         stop_at_bvPlus = false,
-                                     double       bvPlus         = 3.0);
+    void newton_solver(const double final_anode_voltage, const double tolerance, const std::size_t max_iterations, double voltage_step);
+    void newton_solver_with_mcintyre(const double      final_anode_voltage,
+                                     const double      tolerance,
+                                     const std::size_t max_iterations,
+                                     double            voltage_step,
+                                     const double      step_voltage_mcintyre,
+                                     bool              stop_at_bvPlus = false,
+                                     double            bvPlus         = 3.0);
 
     bool                get_solver_success() const { return m_solver_success; }
     double              get_depletion_width(const double epsilon) const;

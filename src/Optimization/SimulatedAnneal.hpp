@@ -45,11 +45,12 @@ class SimulatedAnnealing {
  private:
     std::size_t     m_nb_variables;
     std::size_t     m_max_iterations;
-    std::size_t     m_current_iteration;
     CoolingSchedule m_cooling_schedule;
     double          m_initial_temperature;
     double          m_final_temperature;
     double          m_temperature;
+    
+    std::size_t     m_current_iteration;
 
     std::random_device                     m_random_device;
     std::mt19937                           m_generator;
@@ -98,7 +99,7 @@ class SimulatedAnnealing {
 
  public:
     SimulatedAnnealing() = delete;
-    SimulatedAnnealing(std::size_t                                m_nb_variables,
+    SimulatedAnnealing(std::size_t                                nb_variables,
                        CoolingSchedule                            cooling_schedule,
                        std::size_t                                max_iterations,
                        double                                     initial_temperature,

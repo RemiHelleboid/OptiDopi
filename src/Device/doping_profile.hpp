@@ -16,7 +16,7 @@
 #include <random>
 #include <vector>
 
-constexpr double m3_to_cm3 = 1.0e6;
+// constexpr double m3_to_cm3 = 1.0e6;
 
 class doping_profile {
  private:
@@ -45,14 +45,14 @@ class doping_profile {
                           double      length_intrinsic,
                           double      donor_level,
                           double      acceptor_level,
-                          double      intrisic_level);
+                          double      intrinsic_level);
 
     void set_up_advanced_pin(double              xlength,
                              std::size_t         number_points,
                              double              length_donor,
                              double              length_intrinsic,
                              double              donor_level,
-                             double              intrisic_level,
+                             double              intrinsic_level,
                              std::vector<double> list_x_acceptor,
                              std::vector<double> list_acceptor_level);
 

@@ -1,5 +1,5 @@
-set(HEADER_FILES_LIBDEVICE  "SimulatedAnneal.hpp" "ParticleSwarm.hpp" "GradientDescent.hpp" "MainFunctions.hpp")
-set(SOURCE_FILES_LIBDEVICE "SimulatedAnneal.cpp" "ParticleSwarm.cpp" "GradientDescent.cpp" "MainFunctions.cpp")
+set(HEADER_FILES_LIBDEVICE  "SimulatedAnneal.hpp" "ParticleSwarm.hpp"  "MainFunctions.hpp")
+set(SOURCE_FILES_LIBDEVICE "SimulatedAnneal.cpp" "ParticleSwarm.cpp" "MainFunctions.cpp")
 
 
 add_library(liboptim STATIC ${SOURCE_FILES_LIBDEVICE} ${HEADER_FILES_LIBDEVICE})

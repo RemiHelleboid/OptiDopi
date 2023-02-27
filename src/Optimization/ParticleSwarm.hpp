@@ -54,20 +54,21 @@ enum class LearningScheme { Constant, Linear, Geometrical };
 
 class ParticleSwarm {
  private:
+    std::size_t m_max_iterations;
+    std::size_t m_number_dimensions;
+    std::size_t m_number_particles;
+
     std::vector<Particle> m_particles;
     std::vector<double>   m_bounds_min;
     std::vector<double>   m_bounds_max;
     double                m_velocity_scaling = 1.0;
 
-    std::vector<double> m_best_position;
+    std::function<double(const std::vector<double>&, const std::vector<double>&)> m_fitness_function;
     double              m_best_fitness;
-
-    std::size_t m_number_particles;
-    std::size_t m_number_dimensions;
-    std::size_t m_max_iterations;
+    std::vector<double> m_best_position;
 
     std::size_t m_current_iteration = 0;
-    std::size_t m_number_iterations_without_improvement;
+    std::size_t m_number_iterations_without_improvement = 0;
 
     double m_inertia_weight;
     double m_cognitive_weight;
@@ -76,11 +77,10 @@ class ParticleSwarm {
     LearningScheme m_cognitive_learning_scheme;
     LearningScheme m_social_learning_scheme;
 
-    std::function<double(const std::vector<double>&, const std::vector<double>&)> m_fitness_function;
-
     std::random_device                     m_random_device;
     std::mt19937                           m_random_engine;
     std::uniform_real_distribution<double> m_uniform_distribution;
+
 
     std::vector<std::vector<double>> m_history_best_position;
     std::string                      m_dir_export = "ParticleSwarmResults/";

@@ -16,7 +16,6 @@
 #include <fmt/ranges.h>
 #include <fmt/xchar.h>
 
-
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -25,14 +24,25 @@
 
 namespace Optimization {
 
-ParticleSwarm::ParticleSwarm(std::size_t                                       max_iterations,
-                             std::size_t                                       number_particles,
-                             std::size_t                                       number_dimensions,
+ParticleSwarm::ParticleSwarm(std::size_t                                                                   max_iterations,
+                             std::size_t                                                                   number_particles,
+                             std::size_t                                                                   number_dimensions,
                              std::function<double(const std::vector<double>&, const std::vector<double>&)> fitness_function)
     : m_max_iterations(max_iterations),
-      m_number_particles(number_particles),
       m_number_dimensions(number_dimensions),
-      m_fitness_function(fitness_function) {
+      m_number_particles(number_particles),
+      m_fitness_function(fitness_function),
+      m_best_fitness(std::numeric_limits<double>::max()),
+      m_best_position(number_dimensions),
+      m_current_iteration(0),
+      m_inertia_weight(0.7298),
+      m_cognitive_weight(1.49618),
+      m_social_weight(1.49618),
+      m_cognitive_learning_scheme(LearningScheme::Constant),
+      m_social_learning_scheme(LearningScheme::Constant),
+      m_random_device(),
+      m_random_engine(m_random_device()),
+      m_uniform_distribution(0.0, 1.0) {
     m_particles.resize(m_number_particles);
     for (std::size_t i = 0; i < m_number_particles; ++i) {
         m_particles[i].set_dimensions(m_number_dimensions);
@@ -70,7 +80,7 @@ void ParticleSwarm::initialize_particles() {
                 -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
         }
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
-        std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
+        std::vector<double> params              = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
         m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position, params);
     }
     // Find the best particle
@@ -122,8 +132,8 @@ void ParticleSwarm::clip_particles() {
 }
 
 void ParticleSwarm::update_particles() {
-    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
-    double current_cognitive_weight = m_cognitive_weight;
+    std::vector<double> params                   = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
+    double              current_cognitive_weight = m_cognitive_weight;
     if (m_cognitive_learning_scheme == LearningScheme::Linear) {
         current_cognitive_weight = m_cognitive_weight * (1.0 - (m_current_iteration / static_cast<double>(m_max_iterations)));
     }
@@ -155,7 +165,7 @@ void ParticleSwarm::update_particles() {
 
 void ParticleSwarm::add_partilce_at_barycenter() {
     std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
-    Particle particle(m_number_dimensions);
+    Particle            particle(m_number_dimensions);
     for (std::size_t i = 0; i < m_number_dimensions; ++i) {
         double sum = 0.0;
         for (std::size_t j = 0; j < m_number_particles; ++j) {
@@ -209,15 +219,12 @@ void ParticleSwarm::optimize() {
     std::cout << std::endl;
 }
 
-
 // void ParticleSwarm::asynchronous_optimize() {
 //     this->set_up_export();
 //     initialize_particles();
 //     while (m_current_iteration <= m_max_iterations) {
 
 // }
-
-
 
 void ParticleSwarm::set_up_export() {
     std::cout << "Setting up export... in : " << m_dir_export << std::endl;

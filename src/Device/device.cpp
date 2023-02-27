@@ -64,14 +64,12 @@ void device::export_poisson_solution(const std::string& directory_name, const st
     if (freq_voltage < 1) {
         freq_voltage = 1;
     }
-        std::filesystem::create_directories(directory_name);
-    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage+=freq_voltage) {
+    std::filesystem::create_directories(directory_name);
+    for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += freq_voltage) {
         const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
         m_list_poisson_solutions[idx_voltage].export_to_file(filename);
     }
 }
-
-
 
 void device::export_poisson_solution(const std::string& directory_name, const std::string& prefix) const {
     std::filesystem::create_directories(directory_name);
@@ -101,7 +99,6 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     if (index_step == 0) {
         index_step = 1;
     }
-    const double        micron_to_cm = 1.0e-4;
     std::vector<double> x_line_micron(m_doping_profile.get_x_line());
     m_mcintyre_solver.set_xline(x_line_micron);
     // std::cout << "Max x = " << x_line_micron.back() << std::endl;
@@ -167,8 +164,6 @@ std::vector<double> device::get_list_total_breakdown_probability() const {
     return list_total_breakdown_probability;
 }
 
-
-
 double device::extract_breakdown_voltage(double brp_threshold) const {
     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
     auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double& voltage) {
@@ -227,23 +222,15 @@ double device::get_depletion_at_voltage(double voltage) const {
     return interpolated_depletion;
 }
 
-double sigmoid(double x) {
-    return 1.0 / (1.0 + std::exp(-x));
-}
+double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
 cost_function_result device::compute_cost_function(double voltage_above_breakdown, double time) const {
-    const double alpha_BV                     = 20.0;
-    const double alpha_BP                     = 5.0;
-    const double alpha_DW                     = 200.0;
-    const double alpha_tot_acceptor           = 1.0e-6;
-    double       BV_TOL                       = 2.0;
-    auto         total_acceptor_concentration = m_doping_profile.get_acceptor_concentration();
-    double integral_acceptor_concentration = std::accumulate(total_acceptor_concentration.begin(), total_acceptor_concentration.end(), 0.0);
-    integral_acceptor_concentration /= total_acceptor_concentration.size();
-    double log_acceptor_concentration = std::log10(integral_acceptor_concentration);
-    log_acceptor_concentration -= 14.0;
-    double total_acceptor_obj   = alpha_tot_acceptor * log_acceptor_concentration;
-    double BV_Target            = 20.0;
+    const double alpha_BV  = 20.0;
+    const double alpha_BP  = 5.0;
+    const double alpha_DW  = 200.0;
+    double       BV_TOL    = 2.0;
+    double       BV_Target = 20.0;
+
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
     double DepletionWidth       = get_depletion_at_voltage(BreakdownVoltage);
@@ -251,17 +238,20 @@ cost_function_result device::compute_cost_function(double voltage_above_breakdow
     double BP_cost              = -alpha_BP * BreakdownProbability;
     double meter_to_micron      = 1.0e6;
     double DW_cost              = -alpha_DW * (DepletionWidth / m_doping_profile.get_x_line().back()) * meter_to_micron;
-    // std::cout << "DW: " << DepletionWidth << " --> COST: " << DW_cost << std::endl;
-    // std::cout << "DW: " << (m_doping_profile.get_x_line().back()) << std::endl;
-    // std::cout << "BV: " << BreakdownVoltage << " --> COST: " << BV_cost << std::endl;
+
+    // If time == 0, we show the initial FoM.
+    if (time == 0.0) {
+        fmt::print("Initial FoM: BV = {:5.2f} V, BP = {:5.2f} %, DW = {:5.2f} um\n",
+                   BreakdownVoltage,
+                   BreakdownProbability * 100.0,
+                   DepletionWidth * meter_to_micron);
+    }
 
     if (std::isnan(BV_cost)) {
         BV_cost = 1.0e6;
     }
-    double      cost = BV_cost + BP_cost + DW_cost;
-    // Renormalize the cost function by arctan
-    double total_weight = alpha_BP + alpha_DW;
-    cost = 100.0 * cost;
+    double cost = BV_cost + BP_cost + DW_cost;
+    cost        = 100.0 * cost;
 
     result_simu result;
     result.BV  = BreakdownVoltage;

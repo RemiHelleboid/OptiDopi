@@ -102,8 +102,9 @@ void PoissonSolution::export_to_file(const std::string& filename) const {
 }
 
 NewtonPoissonSolver::NewtonPoissonSolver(const Eigen::VectorXd& doping_concentration, const Eigen::VectorXd& x_line)
-    : m_doping_concentration(doping_concentration),
-      m_x_line(x_line) {
+    : m_x_line(x_line),
+      m_doping_concentration(doping_concentration),
+      m_number_points(x_line.size()) {
     m_matrix.resize(m_x_line.size(), m_x_line.size());
     m_vector_rhs.resize(m_x_line.size());
     m_solution.resize(m_x_line.size());
@@ -139,6 +140,7 @@ void NewtonPoissonSolver::set_doping_profile(const doping_profile& my_doping_pro
     constexpr double microns_to_meters = 1e-6;
     constexpr double m3_to_cm3         = 1e6;
     std::size_t      number_of_points  = my_doping_profile.get_x_line().size();
+    m_number_points                    = number_of_points;
     m_doping_concentration.resize(number_of_points);
     m_x_line.resize(number_of_points);
     for (std::size_t i = 0; i < number_of_points; ++i) {
@@ -155,13 +157,13 @@ void NewtonPoissonSolver::set_doping_profile(const doping_profile& my_doping_pro
 }
 
 void NewtonPoissonSolver::compute_electron_density(const double applied_voltage) {
-    for (int i = 0; i < m_x_line.size(); ++i) {
+    for (std::size_t i = 0; i < m_number_points; ++i) {
         m_electron_density(i) = m_intrisinc_carrier_concentration * std::exp((m_solution(i) - applied_voltage) / m_thermal_voltage);
     }
 }
 
 void NewtonPoissonSolver::compute_hole_density(const double applied_voltage) {
-    for (int i = 0; i < m_x_line.size(); ++i) {
+    for (std::size_t i = 0; i < m_number_points; ++i) {
         m_hole_density(i) = m_intrisinc_carrier_concentration * std::exp((applied_voltage - m_solution(i)) / m_thermal_voltage);
     }
 }
@@ -169,19 +171,19 @@ void NewtonPoissonSolver::compute_hole_density(const double applied_voltage) {
 void NewtonPoissonSolver::compute_total_charge(const double cathode_voltage, const double anode_voltage) {
     compute_electron_density(anode_voltage);
     compute_hole_density(cathode_voltage);
-    for (int i = 0; i < m_x_line.size(); ++i) {
+    for (std::size_t i = 0; i < m_number_points; ++i) {
         m_total_charge(i) = m_hole_density(i) - m_electron_density(i);
     }
 }
 
-void NewtonPoissonSolver::compute_derivative_total_charge(const double cathode_voltage, const double anode_voltage) {
-    for (int i = 0; i < m_x_line.size(); ++i) {
+void NewtonPoissonSolver::compute_derivative_total_charge() {
+    for (std::size_t i = 0; i < m_number_points; ++i) {
         m_derivative_total_charge(i) = (1.0 / m_thermal_voltage) * (-m_hole_density(i) - m_electron_density(i));
     }
 }
 
 void NewtonPoissonSolver::compute_initial_guess() {
-    for (std::size_t index_x = 0; index_x < m_x_line.size(); ++index_x) {
+    for (std::size_t index_x = 0; index_x < m_number_points; ++index_x) {
         const double doping = m_doping_concentration(index_x);
         if (doping > 0.0) {
             const double value_inside_log =
@@ -222,7 +224,7 @@ void NewtonPoissonSolver::compute_matrix() {
     // Build the triplet list
     std::vector<Eigen::Triplet<double>> triplet_list;
     triplet_list.reserve(m_x_line.size() * 3);
-    for (std::size_t idx_x = 1; idx_x < m_x_line.size() - 1; ++idx_x) {
+    for (std::size_t idx_x = 1; idx_x < m_number_points - 1; ++idx_x) {
         triplet_list.emplace_back(idx_x, idx_x - 1, -1.0 / dx_square);
         triplet_list.emplace_back(idx_x, idx_x + 1, -1.0 / dx_square);
         double diag_value = 2.0 / dx_square - q_over_eps * m_derivative_total_charge(idx_x);
@@ -239,7 +241,7 @@ void NewtonPoissonSolver::update_matrix() {
     double dx_square = m_x_line(1) - m_x_line(0);
     dx_square *= dx_square;
     const double q_over_eps = electronic_charge / (vacuum_permittivity * silicon_premitivity);
-    for (std::size_t idx_x = 0; idx_x < m_x_line.size(); ++idx_x) {
+    for (std::size_t idx_x = 0; idx_x < m_number_points; ++idx_x) {
         double diag_value               = 2.0 / dx_square - q_over_eps * m_derivative_total_charge(idx_x);
         m_matrix.coeffRef(idx_x, idx_x) = diag_value;
     }
@@ -249,7 +251,7 @@ void NewtonPoissonSolver::compute_right_hand_side() {
     m_vector_rhs.setZero();
     double       dx         = m_x_line(1) - m_x_line(0);
     const double q_over_eps = electronic_charge / (vacuum_permittivity * silicon_premitivity);
-    for (std::size_t idx_x = 1; idx_x < m_x_line.size() - 1; ++idx_x) {
+    for (std::size_t idx_x = 1; idx_x < m_number_points - 1; ++idx_x) {
         m_vector_rhs(idx_x) = -q_over_eps * m_doping_concentration(idx_x) -
                               (1.0 / (dx * dx)) * (-m_solution(idx_x + 1) + 2.0 * m_solution(idx_x) - m_solution(idx_x - 1)) +
                               q_over_eps * m_total_charge(idx_x);
@@ -259,10 +261,10 @@ void NewtonPoissonSolver::compute_right_hand_side() {
     m_vector_rhs(m_x_line.size() - 1) = 0.0;
 }
 
-void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
-                                        const double tolerance,
-                                        const int    max_iterations,
-                                        double       voltage_step) {
+void NewtonPoissonSolver::newton_solver(const double      final_anode_voltage,
+                                        const double      tolerance,
+                                        const std::size_t max_iterations,
+                                        double            voltage_step) {
     auto start = std::chrono::high_resolution_clock::now();
 
     double       anode_voltage   = 0.0;
@@ -275,7 +277,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
     compute_initial_guess();
     compute_total_charge(cathode_voltage, anode_voltage);
-    compute_derivative_total_charge(cathode_voltage, anode_voltage);
+    compute_derivative_total_charge();
     compute_matrix();
     update_matrix();
     compute_right_hand_side();
@@ -283,8 +285,8 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
     m_solver.analyzePattern(m_matrix);
 
     Eigen::VectorXd m_new_solution(m_x_line.size());
-    const double    lambda = 1.0;
-    m_solver_success = false;
+    const double    lambda         = 1.0;
+    m_solver_success               = false;
     std::size_t index_voltage_step = 0;
     while (anode_voltage <= final_anode_voltage) {
         // std::cout << "\rVoltage anode: " << anode_voltage << std::flush;
@@ -293,7 +295,7 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
         while (residual > tolerance && index_iteration < max_iterations) {
             index_iteration++;
             compute_total_charge(cathode_voltage, anode_voltage);
-            compute_derivative_total_charge(cathode_voltage, anode_voltage);
+            compute_derivative_total_charge();
             update_matrix();
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
@@ -348,13 +350,13 @@ void NewtonPoissonSolver::newton_solver(const double final_anode_voltage,
  * @param stop_at_bvPlus
  * @param bvPlus
  */
-void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_voltage,
-                                                      const double tolerance,
-                                                      const int    max_iterations,
-                                                      double       voltage_step,
-                                                      const double step_voltage_mcintyre,
-                                                      bool         stop_at_bvPlus,
-                                                      double       bvPlus) {
+void NewtonPoissonSolver::newton_solver_with_mcintyre(const double      final_anode_voltage,
+                                                      const double      tolerance,
+                                                      const std::size_t max_iterations,
+                                                      double            voltage_step,
+                                                      const double      step_voltage_mcintyre,
+                                                      bool              stop_at_bvPlus,
+                                                      double            bvPlus) {
     auto start = std::chrono::high_resolution_clock::now();
 
     double       anode_voltage   = 0.0;
@@ -367,7 +369,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_v
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
     compute_initial_guess();
     compute_total_charge(cathode_voltage, anode_voltage);
-    compute_derivative_total_charge(cathode_voltage, anode_voltage);
+    compute_derivative_total_charge();
     compute_matrix();
     update_matrix();
     compute_right_hand_side();
@@ -382,14 +384,14 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_v
     std::vector<double> x_line_micron = m_xline_vector;
     std::for_each(x_line_micron.begin(), x_line_micron.end(), [m_to_micron](double& value) { value *= m_to_micron; });
     m_mcintyre_solver.set_xline(x_line_micron);
-    double tol               = 1e-6;
-    double breakdown_voltage = 0.0;
-    const double EF_Threshold = 3.0e5;
+    double       tol               = 1e-6;
+    double       breakdown_voltage = 0.0;
+    // const double EF_Threshold      = 3.0e5;
 
     m_solver.analyzePattern(m_matrix);
 
     Eigen::VectorXd m_new_solution(m_x_line.size());
-    const double    lambda = 1.0;
+    const double    lambda            = 1.0;
     bool            breakdown_reached = false;
 
     std::size_t index_voltage_step = 0;
@@ -400,7 +402,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_v
         while (residual > tolerance && index_iteration < max_iterations) {
             index_iteration++;
             compute_total_charge(cathode_voltage, anode_voltage);
-            compute_derivative_total_charge(cathode_voltage, anode_voltage);
+            compute_derivative_total_charge();
             update_matrix();
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
@@ -450,10 +452,10 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double final_anode_v
                 if (m_list_mcintyre_solutions.back().m_mean_breakdown_probability > 1e-3 && !breakdown_reached) {
                     breakdown_voltage = anode_voltage;
                     breakdown_reached = true;
-                    }
-                    if (stop_at_bvPlus && breakdown_reached && anode_voltage > breakdown_voltage + bvPlus) {
-                        // fmt::print("Poison solver stopped :) BV+ = {}\n", breakdown_voltage + bvPlus);
-                        break;
+                }
+                if (stop_at_bvPlus && breakdown_reached && anode_voltage > breakdown_voltage + bvPlus) {
+                    // fmt::print("Poison solver stopped :) BV+ = {}\n", breakdown_voltage + bvPlus);
+                    break;
                 }
             }
         }
@@ -498,7 +500,7 @@ void NewtonPoissonSolver::export_current_solution(const std::string& filename) c
     std::ofstream file(filename);
     if (file.is_open()) {
         file << "X,V,eDensity,hDensity" << std::endl;
-        for (std::size_t idx_x = 0; idx_x < m_x_line.size(); ++idx_x) {
+        for (std::size_t idx_x = 0; idx_x < m_number_points; ++idx_x) {
             file << m_x_line(idx_x) << "," << m_solution(idx_x) << "," << m_electron_density(idx_x) << "," << m_hole_density(idx_x)
                  << std::endl;
         }

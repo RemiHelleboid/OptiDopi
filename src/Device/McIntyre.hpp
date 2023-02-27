@@ -79,7 +79,7 @@ class McIntyre {
 
     void set_xline(std::vector<double> x_line);
     void set_xline(const Eigen::VectorXd& x_line);
-    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess = true, double conv_factor = 1.0);
+    void set_electric_field(std::vector<double> electric_field, bool recompute_initial_guess = false, double conv_factor = 1.0);
     double get_max_electric_field() const;
 
     double                      dPe_func(double Pe, double Ph, int index);
@@ -91,7 +91,6 @@ class McIntyre {
     Eigen::VectorXd             assembleSecondMemberNewton(Eigen::VectorXd breakdownP);
     void                        initial_guess(double eBrP = 0.8, double hBrP = 0.4);
     void                        ComputeDampedNewtonSolution(double tolerance);
-    void                        ComputeDampedNewtonSolutionIterative(double tolerance);
     bool                        get_Solver_Has_Converged() const { return (mSolverHasConverged); };
 
     std::vector<double> get_total_breakdown_probability() const { return m_totalBreakdownProbability; }

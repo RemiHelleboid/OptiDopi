@@ -13,19 +13,19 @@
 #include "fmt/format.h"
 #include "fmt/ostream.h"
 
-SimulatedAnnealing::SimulatedAnnealing(std::size_t                                                            m_nb_variables,
+SimulatedAnnealing::SimulatedAnnealing(std::size_t                                                            nb_variables,
                                        CoolingSchedule                                                        cooling_schedule,
                                        std::size_t                                                            max_iterations,
                                        double                                                                 initial_temperature,
                                        double                                                                 final_temperature,
                                        std::function<double(std::vector<double>, const std::vector<double>&)> cost_function)
-    : m_nb_variables(m_nb_variables),
-      m_cooling_schedule(cooling_schedule),
+    : m_nb_variables(nb_variables),
       m_max_iterations(max_iterations),
-      m_current_iteration(0),
+      m_cooling_schedule(cooling_schedule),
       m_initial_temperature(initial_temperature),
       m_final_temperature(final_temperature),
       m_temperature(initial_temperature),
+      m_current_iteration(0),
       m_random_device(),
       m_generator(m_random_device()),
       m_distribution(0.0, 1.0),
@@ -129,7 +129,7 @@ void SimulatedAnnealing::run() {
             nb_iter_without_improvement = 0;
         } else {
             double delta_cost  = new_cost - m_current_cost;
-            double probability = std::exp(-(new_cost - m_current_cost) / m_temperature);
+            double probability = std::exp(-delta_cost / m_temperature);
             // fmt::print("Delta cost: {}\tProbability: {}\t", delta_cost, probability);
             if (m_distribution(m_generator) < probability) {
                 m_current_solution = new_solution;
@@ -157,6 +157,9 @@ void SimulatedAnnealing::run() {
             case CoolingSchedule::Logarithmic:
                 logarithmic_cooling();
                 break;
+            case CoolingSchedule::Boltzmann:
+                linear_cooling();
+                break;
         }
 
         add_current_solution_to_history();
@@ -169,7 +172,7 @@ void SimulatedAnnealing::run() {
         ++m_current_iteration;
         params[0] = static_cast<double>(m_current_iteration);
 
-        if (nb_iter_without_improvement > int(m_max_iterations / 5)) {
+        if (nb_iter_without_improvement > static_cast<std::size_t>(m_max_iterations / 5.0)) {
             std::cout << "Restart" << std::endl;
             restart();
             nb_iter_without_improvement = 0;
