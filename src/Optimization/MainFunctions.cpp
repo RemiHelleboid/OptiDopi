@@ -14,10 +14,10 @@
 #include "ImpactIonization.hpp"
 #include "OptimStruct.hpp"
 #include "ParticleSwarm.hpp"
-#include "PoissonSolver.hpp"
+#include "PoissonSolver1D.hpp"
 #include "SimulatedAnneal.hpp"
-#include "device.hpp"
-#include "doping_profile.hpp"
+#include "Device1D.hpp"
+#include "DopingProfile1D.hpp"
 #include "fill_vector.hpp"
 #include "omp.h"
 
@@ -29,8 +29,7 @@ namespace Optimization {
 #define N_X 8
 #define DopSmooth 11
 #define NBPOINTS 500
-#define ITER_MAX 100
-
+#define ITER_MAX 10
 
 #define DonorMIN 16
 #define DonorMAX 21
@@ -101,7 +100,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         std::vector<double> acceptor_levels(best_path[i].size() - 2);
         std::vector<double> acceptor_levels_log(best_path[i].begin() + 2, best_path[i].end());
         std::transform(best_path[i].begin() + 2, best_path[i].end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
-        device my_device;
+        Device1D my_device;
         my_device.set_up_complex_diode(x_length,
                                        nb_points,
                                        donor_length,
@@ -159,7 +158,7 @@ double intermediate_cost_function(double              donor_length,
         fmt::print("Error: the size of the acceptor_levels vector is not the same as the acceptor_x vector.\n");
         exit(1);
     }
-    device my_device;
+    Device1D my_device;
     my_device.set_up_complex_diode(x_length,
                                    nb_points,
                                    donor_length,
@@ -191,7 +190,7 @@ double intermediate_cost_function(double              donor_length,
     // double               BV          = cost_result.result.BV;
     // double               BRP         = cost_result.result.BrP;
     // double               DW          = cost_result.result.DW;
-    double               cost        = cost_result.total_cost;
+    double cost = cost_result.total_cost;
     // fmt::print("BV: {:.2f}, BRP: {:.2f}, DW: {:.2e}, Cost: {:.2f}\n", BV, BRP, DW, cost);
 
     return cost;
@@ -292,6 +291,16 @@ void MainSimulatedAnnealingSPAD() {
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
     double          cooling_factor   = 0.99;
+
+    SimulatedAnnealOptions sa_options;
+    sa_options.m_nb_variables        = nb_parameters;
+    sa_options.m_max_iterations      = max_iter;
+    sa_options.m_initial_temperature = initial_temp;
+    sa_options.m_final_temperature   = final_temp;
+    sa_options.m_cooling_schedule    = cooling_schedule;
+    sa_options.m_alpha_cooling       = cooling_factor;
+    sa_options.m_beta_cooling        = 0.0;
+    sa_options.m_log_frequency       = 10;
     // Boundaries setup
     double              min_length_donor = 0.1;
     double              max_length_donor = 1.0;
@@ -307,7 +316,7 @@ void MainSimulatedAnnealingSPAD() {
 #pragma omp parallel
     { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
-    std::size_t nb_doe = nb_threads;
+    std::size_t nb_doe = 1;
     std::cout << "Number DOE: " << nb_doe << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_doe);
@@ -316,21 +325,17 @@ void MainSimulatedAnnealingSPAD() {
 
     std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
-#pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
+// #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
     for (std::size_t i = 0; i < nb_doe; i++) {
-        std::string directory = fmt::format("{}/thread_{}/", DIR_RES, i);
-        std::filesystem::create_directory(directory);
-        SimulatedAnnealing  sa(nb_parameters, cooling_schedule, max_iter, initial_temp, final_temp, cost_function_wrapper);
+        std::string directory        = fmt::format("{}/thread_{}/", DIR_RES, i);
+        sa_options.m_prefix_name_log = directory;
+        std::filesystem::create_directories(directory);
+        SimulatedAnnealing  sa(sa_options, cost_function_wrapper);
         std::vector<double> initial_solution = random_initial_position(min_values, max_values);
         sa.set_initial_solution(initial_solution);
-        sa.set_prefix_name(directory);
-        sa.set_bounds(min_values, max_values);
-        sa.set_alpha_cooling(cooling_factor);
-        sa.create_random_initial_solution();
-        sa.set_frequency_print(50);
         sa.run();
 
-#pragma omp critical
+// #pragma omp critical
         {
             // Save best solution
             sa.export_history();
@@ -355,7 +360,7 @@ void MainSimulatedAnnealingSPAD() {
     std::string new_path       = fmt::format("{}/BEST/", DIR_RES, index);
     std::filesystem::create_directory(new_path);
     std::filesystem::copy(best_path_file, DIR_RES, std::filesystem::copy_options::recursive);
-
+    exit(0);
     // Get history of best path and save it
     std::cout << "Saving best path" << std::endl;
     std::vector<std::vector<double>> best_path = histories[index].solutions;

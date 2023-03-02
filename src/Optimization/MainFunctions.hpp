@@ -29,10 +29,10 @@
 #include "ImpactIonization.hpp"
 #include "OptimStruct.hpp"
 #include "ParticleSwarm.hpp"
-#include "PoissonSolver.hpp"
+#include "PoissonSolver1D.hpp"
 #include "SimulatedAnneal.hpp"
-#include "device.hpp"
-#include "doping_profile.hpp"
+#include "Device1D.hpp"
+#include "DopingProfile1D.hpp"
 #include "fill_vector.hpp"
 #include "omp.h"
 

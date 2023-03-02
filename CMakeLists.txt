@@ -102,6 +102,7 @@ endif()
 
 
 
+add_subdirectory(src/Physics)
 add_subdirectory(src/Utils)
 add_subdirectory(src/Device)
 add_subdirectory(src/Optimization)

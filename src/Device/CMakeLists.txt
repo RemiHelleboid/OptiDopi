@@ -1,10 +1,10 @@
-set(HEADER_FILES_LIBDEVICE "doping_profile.hpp" "device.hpp" "PoissonSolver.hpp" "ImpactIonization.hpp" "McIntyre.hpp")
-set(SOURCE_FILES_LIBDEVICE "doping_profile.cpp" "device.cpp" "PoissonSolver.cpp" "McIntyre.cpp")
+set(HEADER_FILES_LIBDEVICE "DopingProfile1D.hpp" "Device1D.hpp" "PoissonSolver1D.hpp" "McIntyre.hpp" "AdvectionDiffusionMC.hpp" "ParticleAdvectionDiffusionMC.hpp")
+set(SOURCE_FILES_LIBDEVICE "DopingProfile1D.cpp" "Device1D.cpp" "PoissonSolver1D.cpp" "McIntyre.cpp" "AdvectionDiffusionMC.cpp")
 
 
 add_library(libdevice STATIC ${SOURCE_FILES_LIBDEVICE} ${HEADER_FILES_LIBDEVICE})
 target_include_directories(libdevice PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(libdevice PUBLIC libutils)
+target_link_libraries(libdevice PUBLIC libutils libphysics)
 target_link_libraries(libdevice PUBLIC Eigen3::Eigen)
 target_link_libraries(libdevice PUBLIC fmt::fmt)
 

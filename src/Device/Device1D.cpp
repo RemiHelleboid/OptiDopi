@@ -2,7 +2,7 @@
  * @file device.cpp
  */
 
-#include "device.hpp"
+#include "Device1D.hpp"
 
 #include <fmt/core.h>
 #include <fmt/format.h>
@@ -18,27 +18,27 @@
 #include "interpolation.hpp"
 #include "smoother.hpp"
 
-void device::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
+void Device1D::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
 
-void device::setup_pin_diode(double      xlenght,
-                             std::size_t number_points,
-                             double      length_donor,
-                             double      length_intrinsic,
-                             double      donor_level,
-                             double      acceptor_level,
-                             double      intrisic_level) {
+void Device1D::setup_pin_diode(double      xlenght,
+                               std::size_t number_points,
+                               double      length_donor,
+                               double      length_intrinsic,
+                               double      donor_level,
+                               double      acceptor_level,
+                               double      intrisic_level) {
     m_doping_profile
         .set_up_pin_diode(0.0, xlenght, number_points, length_donor, length_intrinsic, donor_level, acceptor_level, intrisic_level);
 }
 
-void device::set_up_complex_diode(double              xlength,
-                                  std::size_t         number_points,
-                                  double              length_donor,
-                                  double              length_intrinsic,
-                                  double              donor_level,
-                                  double              intrisic_level,
-                                  std::vector<double> list_x_acceptor,
-                                  std::vector<double> list_acceptor_level) {
+void Device1D::set_up_complex_diode(double              xlength,
+                                    std::size_t         number_points,
+                                    double              length_donor,
+                                    double              length_intrinsic,
+                                    double              donor_level,
+                                    double              intrisic_level,
+                                    std::vector<double> list_x_acceptor,
+                                    std::vector<double> list_acceptor_level) {
     m_doping_profile.set_up_advanced_pin(xlength,
                                          number_points,
                                          length_donor,
@@ -49,9 +49,9 @@ void device::set_up_complex_diode(double              xlength,
                                          list_acceptor_level);
 }
 
-void device::smooth_doping_profile(int window_size) { m_doping_profile.smooth_doping_profile(window_size); }
+void Device1D::smooth_doping_profile(int window_size) { m_doping_profile.smooth_doping_profile(window_size); }
 
-void device::solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations) {
+void Device1D::solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations) {
     m_poisson_solver.set_doping_profile(m_doping_profile);
     const double voltage_step = 0.01;
     m_poisson_solver.newton_solver(final_anode_voltage, tolerance, max_iterations, voltage_step);
@@ -59,7 +59,17 @@ void device::solve_poisson(const double final_anode_voltage, const double tolera
     m_list_poisson_solutions = m_poisson_solver.get_list_poisson_solutions();
 }
 
-void device::export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const {
+PoissonSolution Device1D::get_poisson_solution_at_voltage(double voltage) const {
+    auto it = std::lower_bound(m_list_voltages.begin(), m_list_voltages.end(), voltage);
+    if (it == m_list_voltages.end()) {
+        std::cout << "Voltage " << voltage << " not found in the list of voltages. Max voltage = " << m_list_voltages.back() << std::endl;
+        throw std::runtime_error("Voltage not found");
+    }
+    std::size_t idx_voltage = std::distance(m_list_voltages.begin(), it);
+    return m_list_poisson_solutions[idx_voltage];
+}
+
+void Device1D::export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const {
     std::size_t freq_voltage = voltage_step / ((m_list_voltages.back() - m_list_voltages.front()) / m_list_voltages.size());
     if (freq_voltage < 1) {
         freq_voltage = 1;
@@ -71,7 +81,7 @@ void device::export_poisson_solution(const std::string& directory_name, const st
     }
 }
 
-void device::export_poisson_solution(const std::string& directory_name, const std::string& prefix) const {
+void Device1D::export_poisson_solution(const std::string& directory_name, const std::string& prefix) const {
     std::filesystem::create_directories(directory_name);
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
         const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
@@ -79,7 +89,7 @@ void device::export_poisson_solution(const std::string& directory_name, const st
     }
 }
 
-void device::export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const {
+void Device1D::export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const {
     // Find nearest voltage
     auto it = std::lower_bound(m_list_voltages.begin(), m_list_voltages.end(), voltage);
     if (it == m_list_voltages.end()) {
@@ -92,7 +102,44 @@ void device::export_poisson_solution_at_voltage(double voltage, const std::strin
     m_list_poisson_solutions[idx_voltage].export_to_file(filename);
 }
 
-void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
+void Device1D::export_poisson_at_voltage_3D_emulation(double             voltage,
+                                                      const std::string& directory_name,
+                                                      const std::string& prefix,
+                                                      double             DY,
+                                                      double             DZ,
+                                                      std::size_t        NY,
+                                                      std::size_t        NZ) const {
+    std::vector<double> x_line_micron(m_doping_profile.get_x_line());
+    std::vector<double> y_line_micron = utils::linspace(0.0, DY, NY);
+    std::vector<double> z_line_micron = utils::linspace(0.0, DZ, NZ);
+    // Find nearest voltage
+    auto it = std::lower_bound(m_list_voltages.begin(), m_list_voltages.end(), voltage);
+    if (it == m_list_voltages.end()) {
+        std::cout << "Voltage " << voltage << " not found in the list of voltages. Max voltage = " << m_list_voltages.back() << std::endl;
+        return;
+    }
+    std::size_t           idx_voltage      = std::distance(m_list_voltages.begin(), it);
+    const PoissonSolution poisson_solution = m_list_poisson_solutions[idx_voltage];
+    std::vector<double>   phi              = poisson_solution.m_potential;
+    std::vector<double>   n                = poisson_solution.m_electron_density;
+    std::vector<double>   p                = poisson_solution.m_hole_density;
+    std::vector<double>   electric_field   = poisson_solution.m_electric_field;
+
+    const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
+    std::ofstream     file(filename);
+    file << "X,Y,Z,ElectrostaticPotential,ElectronDensity,HoleDensity,ElectricField,DopingConcentration" << std::endl;
+    for (std::size_t idx_x = 0; idx_x < x_line_micron.size(); ++idx_x) {
+        for (std::size_t idx_y = 0; idx_y < y_line_micron.size(); ++idx_y) {
+            for (std::size_t idx_z = 0; idx_z < z_line_micron.size(); ++idx_z) {
+                file << x_line_micron[idx_x] << "," << y_line_micron[idx_y] << "," << z_line_micron[idx_z] << "," << phi[idx_x] << ","
+                     << n[idx_x] << "," << p[idx_x] << "," << electric_field[idx_x] << "," << m_doping_profile.get_doping_concentration()[idx_x] << std::endl;
+            }
+        }
+    }
+    file.close();
+}
+
+void Device1D::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     double index_step     = (voltage_step / double(m_list_voltages[1] - m_list_voltages[0]));
     int    index_step_int = int(index_step);
     // std::cout << "index_step = " << index_step << std::endl;
@@ -120,11 +167,11 @@ void device::solve_mcintyre(const double voltage_step, double stop_at_bv_plus) {
     }
 }
 
-void device::solve_poisson_and_mcintyre(const double final_anode_voltage,
-                                        const double tolerance,
-                                        const int    max_iterations,
-                                        double       mcintyre_voltage_step,
-                                        double       stop_at_bv_plus) {
+void Device1D::solve_poisson_and_mcintyre(const double final_anode_voltage,
+                                          const double tolerance,
+                                          const int    max_iterations,
+                                          double       mcintyre_voltage_step,
+                                          double       stop_at_bv_plus) {
     m_poisson_solver.set_doping_profile(m_doping_profile);
     const double voltage_step = 0.01;
 
@@ -142,7 +189,7 @@ void device::solve_poisson_and_mcintyre(const double final_anode_voltage,
     m_list_mcintyre_solutions = m_poisson_solver.get_list_mcintyre_solutions();
 }
 
-void device::export_depletion_width(const std::string& directory_name, const std::string& prefix) const {
+void Device1D::export_depletion_width(const std::string& directory_name, const std::string& prefix) const {
     const double        epsilon                          = 1e-9;
     std::vector<double> list_total_breakdown_probability = m_poisson_solver.get_list_depletion_width(epsilon);
     std::filesystem::create_directories(directory_name);
@@ -156,7 +203,7 @@ void device::export_depletion_width(const std::string& directory_name, const std
     file.close();
 }
 
-std::vector<double> device::get_list_total_breakdown_probability() const {
+std::vector<double> Device1D::get_list_total_breakdown_probability() const {
     std::vector<double> list_total_breakdown_probability;
     for (const auto& mcintyre_solution : m_list_mcintyre_solutions) {
         list_total_breakdown_probability.push_back(mcintyre_solution.total_breakdown_probability.back());
@@ -164,7 +211,7 @@ std::vector<double> device::get_list_total_breakdown_probability() const {
     return list_total_breakdown_probability;
 }
 
-double device::extract_breakdown_voltage(double brp_threshold) const {
+double Device1D::extract_breakdown_voltage(double brp_threshold) const {
     std::vector<double> list_total_breakdown_probability = get_list_total_breakdown_probability();
     auto it_bv = std::find_if(list_total_breakdown_probability.begin(), list_total_breakdown_probability.end(), [&](const double& voltage) {
         return voltage > brp_threshold;
@@ -186,7 +233,7 @@ double device::extract_breakdown_voltage(double brp_threshold) const {
     return (brp_threshold - m_intercept) / m_slope;
 }
 
-void device::export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const {
+void Device1D::export_mcintyre_solution(const std::string& directory_name, const std::string& prefix) const {
     std::cout << "Exporting the McIntyre solution to the directory " << directory_name << std::endl;
     std::filesystem::create_directories(directory_name);
     auto x_line = m_doping_profile.get_x_line();
@@ -211,12 +258,12 @@ void device::export_mcintyre_solution(const std::string& directory_name, const s
     std::cout << "Exporting the McIntyre solution to the directory " << directory_name << " done." << std::endl;
 }
 
-double device::get_brp_at_voltage(double voltage) const {
+double Device1D::get_brp_at_voltage(double voltage) const {
     double interpolated_brp = Utils::interp1d(m_list_mcintyre_voltages, get_list_total_breakdown_probability(), voltage);
     return interpolated_brp;
 }
 
-double device::get_depletion_at_voltage(double voltage) const {
+double Device1D::get_depletion_at_voltage(double voltage) const {
     double epsilon                = 1e-7;
     double interpolated_depletion = Utils::interp1d(m_list_voltages, m_poisson_solver.get_list_depletion_width(epsilon), voltage);
     return interpolated_depletion;
@@ -224,7 +271,7 @@ double device::get_depletion_at_voltage(double voltage) const {
 
 double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
-cost_function_result device::compute_cost_function(double voltage_above_breakdown, double time) const {
+cost_function_result Device1D::compute_cost_function(double voltage_above_breakdown, double time) const {
     const double alpha_BV  = 20.0;
     const double alpha_BP  = 5.0;
     const double alpha_DW  = 200.0;

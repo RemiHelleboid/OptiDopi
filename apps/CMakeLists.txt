@@ -1,6 +1,6 @@
-# add_executable(spad simple_spad.cpp)
-# target_link_libraries(spad libdevice)
-# target_link_libraries(spad fmt::fmt)
+add_executable(spad simple_spad.cpp)
+target_link_libraries(spad libdevice)
+target_link_libraries(spad fmt::fmt)
 
 # add_executable(BVSweep spad_bv_sweep.cpp)
 # target_link_libraries(BVSweep libdevice libutils)
@@ -21,7 +21,6 @@
 # add_executable(pswar_spad_simple pswar_spad_simple.cpp)
 # target_link_libraries(pswar_spad_simple libdevice libutils liboptim)
 # target_link_libraries(pswar_spad_simple fmt::fmt OpenMP::OpenMP_CXX)
-
 
 # add_executable(spad_cost_function spad_cost_function.cpp)
 # target_link_libraries(spad_cost_function libdevice libutils liboptim)

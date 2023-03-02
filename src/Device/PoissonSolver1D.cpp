@@ -2,7 +2,7 @@
  *
  */
 
-#include "PoissonSolver.hpp"
+#include "PoissonSolver1D.hpp"
 
 #include <fmt/core.h>
 
@@ -21,7 +21,7 @@
 
 #include "McIntyre.hpp"
 #include "Physics.hpp"
-#include "doping_profile.hpp"
+#include "DopingProfile1D.hpp"
 #include "gradient.hpp"
 #include "smoother.hpp"
 

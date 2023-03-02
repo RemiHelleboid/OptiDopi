@@ -12,7 +12,7 @@
 
 #include "McIntyre.hpp"
 #include "Physics.hpp"
-#include "doping_profile.hpp"
+#include "DopingProfile1D.hpp"
 
 typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> SolverSparseLU;
 

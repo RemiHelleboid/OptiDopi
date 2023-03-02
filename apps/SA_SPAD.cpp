@@ -9,14 +9,6 @@
 #include <filesystem>
 #include <numeric>
 
-#include "ImpactIonization.hpp"
-#include "OptimStruct.hpp"
-#include "ParticleSwarm.hpp"
-#include "PoissonSolver.hpp"
-#include "SimulatedAnneal.hpp"
-#include "device.hpp"
-#include "doping_profile.hpp"
-#include "fill_vector.hpp"
 
 #include "MainFunctions.hpp"
 

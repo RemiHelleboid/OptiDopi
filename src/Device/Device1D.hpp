@@ -16,9 +16,9 @@
 #include <random>
 #include <vector>
 
+#include "DopingProfile1D.hpp"
 #include "McIntyre.hpp"
-#include "PoissonSolver.hpp"
-#include "doping_profile.hpp"
+#include "PoissonSolver1D.hpp"
 
 struct result_simu {
     double BV  = 0.0;
@@ -45,7 +45,6 @@ struct cost_function_result {
     double      DW_cost;
     double      total_cost;
 
-
     void set_NaN() {
         result.set_NaN();
         BV_cost    = -std::numeric_limits<double>::quiet_NaN();
@@ -62,7 +61,7 @@ struct cost_function_result {
     }
 };
 
-class device {
+class Device1D {
  private:
     doping_profile m_doping_profile;
 
@@ -76,26 +75,30 @@ class device {
     std::vector<mcintyre::McIntyreSolution> m_list_mcintyre_solutions;
 
  public:
-    device()  = default;
-    ~device() = default;
+    Device1D()  = default;
+    Device1D(const Device1D&) = default;
+    Device1D(Device1D&&)      = default;
+    Device1D& operator=(const Device1D&) = default;
+
+    ~Device1D() = default;
 
     const doping_profile& get_doping_profile() const { return m_doping_profile; }
 
     void add_doping_profile(doping_profile& doping_profile);
-    void setup_pin_diode(double      xlenght,
+    void setup_pin_diode(double      x_length,
                          std::size_t number_points,
                          double      length_donor,
                          double      length_intrinsic,
                          double      donor_level,
                          double      acceptor_level,
-                         double      intrisic_level);
+                         double      intrinsic_level);
 
-    void set_up_complex_diode(double              xlength,
+    void set_up_complex_diode(double              x_length,
                               std::size_t         number_points,
                               double              length_donor,
                               double              length_intrinsic,
                               double              donor_level,
-                              double              intrisic_level,
+                              double              intrinsic_level,
                               std::vector<double> list_x_acceptor,
                               std::vector<double> list_acceptor_level);
 
@@ -107,6 +110,8 @@ class device {
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
     void export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const;
     void export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const;
+    void export_poisson_at_voltage_3D_emulation(double voltage, const std::string& directory_name, const std::string& prefix, double DY, double DZ, std::size_t NY, std::size_t NZ) const;
+    PoissonSolution get_poisson_solution_at_voltage(double voltage) const;
 
     const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }
     const std::vector<PoissonSolution>& get_list_poisson_solutions() const { return m_list_poisson_solutions; }

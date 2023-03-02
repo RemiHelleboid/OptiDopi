@@ -15,7 +15,7 @@
 #include <memory>
 #include <random>
 
-#include "device.hpp"
+#include "Device1D.hpp"
 
 
 

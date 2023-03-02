@@ -20,6 +20,10 @@ struct SimulatedAnnealHistory {
 
     void export_to_csv(const std::string& filename) {
         std::ofstream file(filename);
+        // Check if file is open
+        if (!file.is_open()) {
+            throw std::runtime_error(fmt::format("Could not open file {} for writing", filename));
+        }
         file << "iteration,cost,temperature";
         for (std::size_t i = 0; i < solutions[0].size(); ++i) {
             file << fmt::format(",x{}", i);
@@ -41,22 +45,29 @@ enum class CoolingSchedule {
     Boltzmann,
 };
 
-class SimulatedAnnealing {
- private:
+struct SimulatedAnnealOptions {
     std::size_t     m_nb_variables;
     std::size_t     m_max_iterations;
     CoolingSchedule m_cooling_schedule;
     double          m_initial_temperature;
     double          m_final_temperature;
-    double          m_temperature;
-    
-    std::size_t     m_current_iteration;
+    double          m_alpha_cooling;
+    double          m_beta_cooling;
+
+    std::size_t       m_log_frequency   = 100;
+    std::string m_prefix_name_log = "";
+};
+
+class SimulatedAnnealing {
+ private:
+    SimulatedAnnealOptions m_options;
+
+    double      m_temperature;
+    std::size_t m_current_iteration;
 
     std::random_device                     m_random_device;
     std::mt19937                           m_generator;
     std::uniform_real_distribution<double> m_distribution;
-
-    std::size_t m_frequency_print = 100;
 
     /**
      * @brief Cost function
@@ -95,18 +106,14 @@ class SimulatedAnnealing {
 
     SimulatedAnnealHistory m_history;
 
-    std::string m_prefix_name = "";
-
  public:
     SimulatedAnnealing() = delete;
-    SimulatedAnnealing(std::size_t                                nb_variables,
-                       CoolingSchedule                            cooling_schedule,
-                       std::size_t                                max_iterations,
-                       double                                     initial_temperature,
-                       double                                     final_temperature,
+    SimulatedAnnealing(const SimulatedAnnealOptions&                                          sa_options,
                        std::function<double(std::vector<double>, const std::vector<double>&)> cost_function);
-    const std::string&  get_prefix_name() const { return m_prefix_name; }
-    void                set_prefix_name(const std::string& prefix_name) { m_prefix_name = prefix_name; }
+
+    SimulatedAnnealOptions&       options() { return m_options; }
+    const SimulatedAnnealOptions& get_options() const { return m_options; }
+
     void                set_bounds(std::vector<std::pair<double, double>> bounds);
     void                set_bounds(std::vector<double> bounds_min, std::vector<double> bounds_max);
     std::vector<double> clip_variables(const std::vector<double>& variables) const;
@@ -125,16 +132,12 @@ class SimulatedAnnealing {
 
     void add_current_solution_to_history();
 
-    void set_cooling_schedule(CoolingSchedule cooling_schedule) { m_cooling_schedule = cooling_schedule; }
-    void set_frequency_print(std::size_t frequency_print) { m_frequency_print = frequency_print; }
-
     void linear_cooling();
     void geometrical_cooling(double alpha);
     void exponential_cooling(double alpha);
     void logarithmic_cooling();
 
     std::vector<double> neighbour_function();
-
 
     void run();
     void restart();

@@ -13,34 +13,25 @@
 #include "fmt/format.h"
 #include "fmt/ostream.h"
 
-SimulatedAnnealing::SimulatedAnnealing(std::size_t                                                            nb_variables,
-                                       CoolingSchedule                                                        cooling_schedule,
-                                       std::size_t                                                            max_iterations,
-                                       double                                                                 initial_temperature,
-                                       double                                                                 final_temperature,
+SimulatedAnnealing::SimulatedAnnealing(const SimulatedAnnealOptions&                                          sa_options,
                                        std::function<double(std::vector<double>, const std::vector<double>&)> cost_function)
-    : m_nb_variables(nb_variables),
-      m_max_iterations(max_iterations),
-      m_cooling_schedule(cooling_schedule),
-      m_initial_temperature(initial_temperature),
-      m_final_temperature(final_temperature),
-      m_temperature(initial_temperature),
+    : m_options(sa_options),
+      m_temperature(m_options.m_initial_temperature),
       m_current_iteration(0),
       m_random_device(),
       m_generator(m_random_device()),
       m_distribution(0.0, 1.0),
       m_cost_function(cost_function),
       m_history{} {
-    m_alpha_cooling = 0.99;
-    m_bounds.resize(m_nb_variables);
-    m_current_solution.resize(m_nb_variables);
+    m_bounds.resize(m_options.m_nb_variables);
+    m_current_solution.resize(m_options.m_nb_variables);
 }
 
 void SimulatedAnnealing::set_bounds(std::vector<std::pair<double, double>> bounds) { m_bounds = bounds; }
 
 void SimulatedAnnealing::set_bounds(std::vector<double> bounds_min, std::vector<double> bounds_max) {
     m_bounds.clear();
-    for (std::size_t i = 0; i < m_nb_variables; ++i) {
+    for (std::size_t i = 0; i < m_options.m_nb_variables; ++i) {
         m_bounds.push_back(std::make_pair(bounds_min[i], bounds_max[i]));
     }
 }
@@ -60,11 +51,11 @@ void SimulatedAnnealing::create_random_initial_solution() {
     // fmt::print("\n");
 }
 
-void SimulatedAnnealing::set_max_iterations(std::size_t max_iterations) { m_max_iterations = max_iterations; }
+void SimulatedAnnealing::set_max_iterations(std::size_t max_iterations) { m_options.m_max_iterations = max_iterations; }
 
-void SimulatedAnnealing::set_initial_temperature(double initial_temperature) { m_initial_temperature = initial_temperature; }
+void SimulatedAnnealing::set_initial_temperature(double initial_temperature) { m_options.m_initial_temperature = initial_temperature; }
 
-void SimulatedAnnealing::set_final_temperature(double final_temperature) { m_final_temperature = final_temperature; }
+void SimulatedAnnealing::set_final_temperature(double final_temperature) { m_options.m_final_temperature = final_temperature; }
 
 std::vector<double> SimulatedAnnealing::clip_variables(const std::vector<double>& variables) const {
     std::vector<double> clipped_variables;
@@ -81,24 +72,24 @@ void SimulatedAnnealing::add_current_solution_to_history() {
 }
 
 void SimulatedAnnealing::linear_cooling() {
-    m_temperature = m_initial_temperature * (1.0 - (double)m_current_iteration / (double)m_max_iterations) +
-                    m_final_temperature * (double)m_current_iteration / (double)m_max_iterations;
+    m_temperature = m_options.m_initial_temperature * (1.0 - (double)m_current_iteration / (double)m_options.m_max_iterations) +
+                    m_options.m_final_temperature * (double)m_current_iteration / (double)m_options.m_max_iterations;
 }
 
 void SimulatedAnnealing::geometrical_cooling(double alpha) { m_temperature *= alpha; }
 
 void SimulatedAnnealing::exponential_cooling(double alpha) {
-    m_temperature = m_initial_temperature * std::exp(-alpha * (double)m_current_iteration);
+    m_temperature = m_options.m_initial_temperature * std::exp(-alpha * (double)m_current_iteration);
 }
 
-void SimulatedAnnealing::logarithmic_cooling() { m_temperature = m_initial_temperature / std::log(1.0 + (double)m_current_iteration); }
+void SimulatedAnnealing::logarithmic_cooling() { m_temperature = m_options.m_initial_temperature / std::log(1.0 + (double)m_current_iteration); }
 
 std::vector<double> SimulatedAnnealing::neighbour_function() {
     std::vector<double>                    new_solution = m_current_solution;
-    double                                 factor       = 1.0 - pow(m_current_iteration / static_cast<double>(m_max_iterations), 0.25);
+    double                                 factor       = 1.0 - pow(m_current_iteration / static_cast<double>(m_options.m_max_iterations), 0.25);
     std::uniform_real_distribution<double> distribution_(-1.0, 1.0);
 
-    for (std::size_t i = 0; i < m_nb_variables; ++i) {
+    for (std::size_t i = 0; i < m_options.m_nb_variables; ++i) {
         double range = m_bounds[i].second - m_bounds[i].first;
         new_solution[i] += distribution_(m_generator) * range * 1 * factor;
     }
@@ -111,15 +102,15 @@ void SimulatedAnnealing::restart() {
 }
 
 void SimulatedAnnealing::run() {
-    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
+    std::vector<double> params = {static_cast<double>(m_current_iteration), static_cast<double>(m_options.m_max_iterations)};
     m_current_cost             = m_cost_function(m_current_solution, params);
     m_best_solution            = m_current_solution;
     m_best_cost                = m_current_cost;
 
     std::size_t nb_iter_with_change         = 0;
     std::size_t nb_iter_without_improvement = 0;
-    while (m_current_iteration < m_max_iterations) {
-    // while (m_current_iteration < m_max_iterations && m_temperature > m_final_temperature) {
+    while (m_current_iteration < m_options.m_max_iterations) {
+        // while (m_current_iteration < m_options.m_max_iterations && m_temperature > m_options.m_final_temperature) {
         std::vector<double> new_solution = neighbour_function();
         double              new_cost     = m_cost_function(new_solution, params);
         if (new_cost < m_current_cost) {
@@ -144,7 +135,7 @@ void SimulatedAnnealing::run() {
             m_best_cost     = m_current_cost;
         }
 
-        switch (m_cooling_schedule) {
+        switch (m_options.m_cooling_schedule) {
             case CoolingSchedule::Linear:
                 linear_cooling();
                 break;
@@ -165,14 +156,14 @@ void SimulatedAnnealing::run() {
         add_current_solution_to_history();
         // Print log with format: iteration, temperature, cost, with fmt::print
         double ratio = (double)nb_iter_with_change / (double)m_current_iteration;
-        if (m_current_iteration % m_frequency_print == 0) {
+        if (m_current_iteration % m_options.m_log_frequency == 0) {
             fmt::print("{}, {:.2e}, {:.5e} Ratio: {:.2f}\n", m_current_iteration, m_temperature, m_current_cost, ratio);
         }
 
         ++m_current_iteration;
         params[0] = static_cast<double>(m_current_iteration);
 
-        if (nb_iter_without_improvement > static_cast<std::size_t>(m_max_iterations / 5.0)) {
+        if (nb_iter_without_improvement > static_cast<std::size_t>(m_options.m_max_iterations / 5.0)) {
             std::cout << "Restart" << std::endl;
             restart();
             nb_iter_without_improvement = 0;
@@ -184,6 +175,6 @@ void SimulatedAnnealing::run() {
 }
 
 void SimulatedAnnealing::export_history() {
-    std::string filename = m_prefix_name + "history_optimization.csv";
+    std::string filename = m_options.m_prefix_name_log + "history_optimization.csv";
     m_history.export_to_csv(filename);
 }

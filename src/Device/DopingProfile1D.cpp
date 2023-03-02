@@ -9,7 +9,7 @@
  *
  */
 
-#include "doping_profile.hpp"
+#include "DopingProfile1D.hpp"
 
 #include <algorithm>
 #include <fstream>
