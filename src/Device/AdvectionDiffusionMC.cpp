@@ -15,7 +15,6 @@
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
-
 #include <cmath>
 #include <iostream>
 #include <memory>
@@ -60,6 +59,8 @@ void SimulationADMC::AddElectrons(std::size_t number_of_electrons) {
         Vector3     position(x, y, z);
         std::size_t new_index    = m_particles.size();
         Particle    new_electron = Particle(new_index, ParticleType::electron, position);
+        double      rpl_number   = m_distribution_uniform(m_generator);
+        new_electron.set_rpl_number(rpl_number);
         m_particles.push_back(new_electron);
     }
 }
@@ -68,6 +69,8 @@ void SimulationADMC::AddElectrons(std::size_t number_of_electrons, const Vector3
     for (std::size_t i = 0; i < number_of_electrons; ++i) {
         std::size_t new_index    = m_particles.size();
         Particle    new_electron = Particle(new_index, ParticleType::electron, position);
+        double      rpl_number   = m_distribution_uniform(m_generator);
+        new_electron.set_rpl_number(rpl_number);
         m_particles.push_back(new_electron);
     }
 }
@@ -79,16 +82,20 @@ void SimulationADMC::AddHoles(std::size_t number_of_holes) {
         double      y = m_parameters.m_y_width * m_distribution_uniform(m_generator);
         double      z = m_parameters.m_z_width * m_distribution_uniform(m_generator);
         Vector3     position(x, y, z);
-        std::size_t new_index = m_particles.size();
-        Particle    new_hole  = Particle(new_index, ParticleType::electron, position);
+        std::size_t new_index  = m_particles.size();
+        Particle    new_hole   = Particle(new_index, ParticleType::electron, position);
+        double      rpl_number = m_distribution_uniform(m_generator);
+        new_hole.set_rpl_number(rpl_number);
         m_particles.push_back(new_hole);
     }
 }
 
 void SimulationADMC::AddHoles(std::size_t number_of_holes, const Vector3& position) {
     for (std::size_t i = 0; i < number_of_holes; ++i) {
-        std::size_t new_index = m_particles.size();
-        Particle    new_hole  = Particle(new_index, ParticleType::hole, position);
+        std::size_t new_index  = m_particles.size();
+        Particle    new_hole   = Particle(new_index, ParticleType::hole, position);
+        double      rpl_number = m_distribution_uniform(m_generator);
+        new_hole.set_rpl_number(rpl_number);
         m_particles.push_back(new_hole);
     }
 }
@@ -116,35 +123,76 @@ void SimulationADMC::PerformDriftDiffusionStep() {
     }
 }
 
-void SimulationADMC::RunSimulation() {
+void SimulationADMC::PerformImpactIonizationStep() {
+    std::size_t nb_particle = m_particles.size();
+    bool at_least_one_impact_ionization = false;
+    for (std::size_t idx_part = 0; idx_part < nb_particle; ++idx_part) {
+        m_particles[idx_part].perform_impact_ionization_step(m_parameters.m_time_step);
+        if (m_particles[idx_part].has_impact_ionized()) {
+            at_least_one_impact_ionization = true;
+            m_history.m_all_impact_ionization_positions.push_back(m_particles[idx_part].position());
+            std::size_t index_new_particles   = m_particles.size();
+            double      new_r_parent_particle = m_distribution_uniform(m_generator);
+            m_particles[idx_part].set_rpl_number(new_r_parent_particle);
+            m_particles[idx_part].set_cumulative_impact_ionization(0.0);
+            if (m_parameters.m_activate_particle_creation) {
+                Particle new_particle = Particle(index_new_particles, ParticleType::electron, m_particles[idx_part].position());
+                double   new_rpl      = m_distribution_uniform(m_generator);
+                new_particle.set_rpl_number(new_rpl);
+                m_particles.push_back(new_particle);
+                Particle new_particle2 = Particle(index_new_particles + 1, ParticleType::hole, m_particles[idx_part].position());
+                double   new_rpl2      = m_distribution_uniform(m_generator);
+                new_particle2.set_rpl_number(new_rpl2);
+                m_particles.push_back(new_particle2);
+            }
+        }
+    }
+    // if (at_least_one_impact_ionization) {
+    //     std::cout << "Number of particles before impact ionization step: " << nb_particle << std::endl;
+    //     std::cout << "Number of particles after impact ionization step: " << m_particles.size() << std::endl;
+    // }
+}
 
+void SimulationADMC::RunSimulation() {
     m_time = 0.0;
     ExportCurrentState();
     while (m_time < m_parameters.m_max_time && m_particles.size() > 0 && m_particles.size() < m_parameters.m_max_particles) {
         SetDataFromDeviceStep();
         PerformDriftDiffusionStep();
+        PerformImpactIonizationStep();
         m_time += m_parameters.m_time_step;
         m_number_steps++;
         ExportCurrentState();
     }
+    if (m_particles.size() == 0) {
+        std::cout << "No more particles, simulation stopped" << std::endl;
+    } else if (m_particles.size() >= m_parameters.m_max_particles) {
+        std::cout << "Maximum number of particles reached, simulation stopped" << std::endl;
+    } else {
+        std::cout << "Maximum time reached, simulation stopped" << std::endl;
+    }
 }
 
 void SimulationADMC::ExportCurrentState() const {
-    std::string filename = fmt::format("{}State.csv.{:05d}", m_parameters.m_output_file, m_number_steps);
+    std::string   filename = fmt::format("{}State.csv.{:05d}", m_parameters.m_output_file, m_number_steps);
     std::ofstream file(filename);
     // Export for each particle, its position, its velocity, and its type
-    file << "X,Y,Z,Vx,Vy,Vz,Type" << std::endl;
+    file << "X,Y,Z,Vx,Vy,Vz,Type,CumulativeIonizationCoeff\n";
     for (const auto& particle : m_particles) {
-        fmt::print(file, "{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:d}\n",
-                   particle.position().x(), particle.position().y(), particle.position().z(),
-                   particle.velocity().x(), particle.velocity().y(), particle.velocity().z(),
-                   static_cast<int>(particle.type()));
+        fmt::print(file,
+                   "{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:.3e},{:d},{:.3e} \n",
+                   particle.position().x(),
+                   particle.position().y(),
+                   particle.position().z(),
+                   particle.velocity().x(),
+                   particle.velocity().y(),
+                   particle.velocity().z(),
+                   static_cast<int>(particle.type()),
+            particle.cumulative_impact_ionization());
     }
     file.close();
 }
 
-
-
-    // void ExportAllParticlesHistory() const;
+// void ExportAllParticlesHistory() const;
 
 }  // namespace ADMC

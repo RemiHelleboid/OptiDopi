@@ -60,6 +60,8 @@ int main(int argc, char** argv) {
     parameters_admc.m_time_step = time_step;
     parameters_admc.m_max_time  = final_time;
     parameters_admc.m_temperature = temperature;
+    parameters_admc.m_activate_impact_ionization = true;
+    parameters_admc.m_activate_particle_creation = true;
     parameters_admc.m_max_particles = 100000;
     parameters_admc.m_output_file = "ADMC_0/ADMC_0_";
     std::filesystem::create_directory("ADMC_0");
@@ -70,7 +72,7 @@ int main(int argc, char** argv) {
 
     ADMC::SimulationADMC simulation_admc(parameters_admc, my_device);
     simulation_admc.set_electric_field(voltage_AMDC);
-    simulation_admc.AddElectrons(1000, {3.25, 0.5, 0.5});
+    simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
     simulation_admc.RunSimulation();
 
     auto end = std::chrono::high_resolution_clock::now();

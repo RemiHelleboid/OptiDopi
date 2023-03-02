@@ -14,6 +14,7 @@
 #include <iostream>
 #include <vector>
 
+#include "ImpactIonization.hpp"
 #include "Mobility.hpp"
 #include "Vector3.hpp"
 #include "physical_constants.hpp"
@@ -103,6 +104,22 @@ class Particle {
         m_position +=
             m_drift_velocity * time_step * cm_to_micron + GaussianReducedCenter * particle_diffusion_sqrt * sqrt(time_step) * cm_to_micron;
         m_time += time_step;
+    }
+
+    void perform_impact_ionization_step(double time_step) {
+        constexpr double cm_to_micron = 1e-4;
+        double m_local_ionization_coeff = 0.0;
+        if (m_type == ParticleType::electron) {
+            m_local_ionization_coeff = mcintyre::alpha_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.11);
+        } else {
+            m_local_ionization_coeff = mcintyre::beta_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.11);
+        }
+        m_cumulative_impact_ionization += time_step * m_drift_velocity.norm() * m_local_ionization_coeff * 1.0/cm_to_micron;
+    }
+
+    bool has_impact_ionized() const {
+        const double integral_path_length = 1 - exp(-m_cumulative_impact_ionization);
+        return integral_path_length >= m_rpl_number;
     }
 
     void add_current_state_to_history() {
