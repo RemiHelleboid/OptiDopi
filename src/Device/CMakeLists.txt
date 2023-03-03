@@ -7,6 +7,7 @@ target_include_directories(libdevice PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(libdevice PUBLIC libutils libphysics)
 target_link_libraries(libdevice PUBLIC Eigen3::Eigen)
 target_link_libraries(libdevice PUBLIC fmt::fmt)
+target_link_libraries(libdevice PUBLIC OpenMP::OpenMP_CXX)
 
 target_compile_features(libdevice PRIVATE cxx_std_20)
 

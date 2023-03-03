@@ -17,14 +17,14 @@
 
 int main(int argc, char** argv) {
     auto start = std::chrono::high_resolution_clock::now();
-    std::size_t number_points    = 1000;
+    std::size_t number_points    = 400;
     double      total_length     = 10.0;
     double      length_donor     = 1.0;
     double      doping_donor     = 5.0e19;
     double      doping_intrinsic = 1.0e13;
     double      length_intrinsic = 0.0;
 
-    double doping_acceptor = 2.0e16;
+    double doping_acceptor = 1.0e16;
 
     Device1D my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
     fmt::print("Start Advection Diffusion Monte Carlo\n");
     double       temperature = 300.0;
     double       time_step   = 1.0e-13;
-    double       final_time  = 1.0e-9;
+    double       final_time  = 5.0e-9;
 
     ADMC::ParametersADMC parameters_admc;
     parameters_admc.m_time_step = time_step;
@@ -62,7 +62,8 @@ int main(int argc, char** argv) {
     parameters_admc.m_temperature = temperature;
     parameters_admc.m_activate_impact_ionization = true;
     parameters_admc.m_activate_particle_creation = true;
-    parameters_admc.m_max_particles = 100000;
+    parameters_admc.m_max_particles = 1000;
+    parameters_admc.m_avalanche_threshold = parameters_admc.m_max_particles;
     parameters_admc.m_output_file = "ADMC_0/ADMC_0_";
     std::filesystem::create_directory("ADMC_0");
 
@@ -70,10 +71,14 @@ int main(int argc, char** argv) {
     my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20); 
 
 
-    ADMC::SimulationADMC simulation_admc(parameters_admc, my_device);
-    simulation_admc.set_electric_field(voltage_AMDC);
-    simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
-    simulation_admc.RunSimulation();
+    // ADMC::SimulationADMC simulation_admc(parameters_admc, my_device);
+    // simulation_admc.set_electric_field(voltage_AMDC);
+    // simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
+    // simulation_admc.RunSimulation();
+
+    std::size_t nb_simulation_per_point = 100;
+    ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point);
+    
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;

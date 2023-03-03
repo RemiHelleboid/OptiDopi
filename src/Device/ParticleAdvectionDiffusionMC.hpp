@@ -110,9 +110,9 @@ class Particle {
         constexpr double cm_to_micron = 1e-4;
         double m_local_ionization_coeff = 0.0;
         if (m_type == ParticleType::electron) {
-            m_local_ionization_coeff = mcintyre::alpha_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.11);
+            m_local_ionization_coeff = mcintyre::alpha_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.12052);
         } else {
-            m_local_ionization_coeff = mcintyre::beta_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.11);
+            m_local_ionization_coeff = mcintyre::beta_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.12052);
         }
         m_cumulative_impact_ionization += time_step * m_drift_velocity.norm() * m_local_ionization_coeff * 1.0/cm_to_micron;
     }

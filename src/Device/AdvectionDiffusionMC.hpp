@@ -150,4 +150,6 @@ class SimulationADMC {
     void ExportAllParticlesHistory() const;
 };
 
+void MainFullADMCSimulation(const ParametersADMC& parameters, const Device1D& device, double voltage, std::size_t nb_simulation_per_points);
+
 }  // namespace ADMC
