@@ -49,7 +49,7 @@ double cost_function(std::vector<double> variables);
 
 void MainParticleSwarmSPAD(std::size_t nb_particles, std::size_t max_iter, double w, double c1, double c2);
 
-void MainSimulatedAnnealingSPAD();
+void MainSimulatedAnnealingSPAD(std::size_t nb_doe, std::size_t max_iter);
 
 
 } // namespace Optimization

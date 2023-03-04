@@ -56,6 +56,10 @@ struct SimulatedAnnealOptions {
 
     std::size_t       m_log_frequency   = 100;
     std::string m_prefix_name_log = "";
+
+    SimulatedAnnealOptions() = default;
+    SimulatedAnnealOptions(const SimulatedAnnealOptions&) = default;
+
 };
 
 class SimulatedAnnealing {

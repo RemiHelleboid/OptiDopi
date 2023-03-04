@@ -88,7 +88,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     // ADMC parameters
     double               temperature = 300.0;
     double               time_step   = 5.0e-14;
-    double               final_time  = 5.0e-9;
+    double               final_time  = 10.0e-9;
     ADMC::ParametersADMC parameters_admc;
     parameters_admc.m_time_step                  = time_step;
     parameters_admc.m_max_time                   = final_time;
@@ -97,7 +97,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     parameters_admc.m_activate_particle_creation = true;
     parameters_admc.m_max_particles              = 200;
     parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
-    std::size_t nb_simulation_per_point          = 10;
+    std::size_t nb_simulation_per_point          = 100;
     std::size_t NbPointsX                        = 100;
 
     // File to export the best path figures (BV, BrP, DW, ...)
@@ -106,7 +106,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 
     const std::string poisson_dir = fmt::format("{}/poisson_res/", dirname);
 
-    std::vector<std::size_t> iter_to_save_for_jitter = {0, 10, 50, 100};
+    std::vector<std::size_t> iter_to_save_for_jitter = {0, 10, 50, 100, 500};
     std::vector<std::unique_ptr<Device1D>> saved_devices(iter_to_save_for_jitter.size());
     std::vector<double>                    saved_BV(iter_to_save_for_jitter.size());
 
@@ -154,11 +154,12 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 
 #pragma omp critical
         {
-            my_device->export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
-            // my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
-            const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
-            std::filesystem::create_directories(poisson_dir_iter);
-            my_device->export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i), voltage_step_export);
+            if (i%10 == 0 || i == best_path.size()) {
+                my_device->export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+                const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
+                std::filesystem::create_directories(poisson_dir_iter);
+                my_device->export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i), voltage_step_export);
+            }
 
             // Save the device for the jitter computation.
             for (std::size_t j = 0; j < iter_to_save_for_jitter.size(); ++j) {
@@ -304,7 +305,7 @@ void MainParticleSwarmSPAD(std::size_t nb_particles, std::size_t max_iter, doubl
  * @brief MAIN FUNCTION FOR SIMULATED ANNEALING.
  *
  */
-void MainSimulatedAnnealingSPAD() {
+void MainSimulatedAnnealingSPAD(std::size_t nb_doe, std::size_t max_iter) {
     const std::string timestamp = fmt::format("{:%Y-%m-%d_%H-%M-%S}", fmt::localtime(std::time(nullptr)));
     const std::string DIR_RES   = fmt::format("results_sa/{}/", timestamp);
     if (!std::filesystem::exists(DIR_RES)) {
@@ -315,12 +316,11 @@ void MainSimulatedAnnealingSPAD() {
     }
 
     // Create simulated annealing object
-    std::size_t     max_iter         = ITER_MAX;
-    double          initial_temp     = 10;
+    double          initial_temp     = 100000;
     double          final_temp       = 0.005;
     std::size_t     nb_parameters    = N_X + 2;
     CoolingSchedule cooling_schedule = CoolingSchedule::Geometrical;
-    double          cooling_factor   = 0.99;
+    double          cooling_factor   = 0.98;
 
     SimulatedAnnealOptions sa_options;
     sa_options.m_nb_variables        = nb_parameters;
@@ -332,7 +332,7 @@ void MainSimulatedAnnealingSPAD() {
     sa_options.m_beta_cooling        = 0.0;
     sa_options.m_log_frequency       = 10;
     // Boundaries setup
-    double              min_length_donor = 0.1;
+    double              min_length_donor = 0.99;
     double              max_length_donor = 1.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
@@ -342,11 +342,6 @@ void MainSimulatedAnnealingSPAD() {
     std::vector<double> max_values(nb_parameters);
     set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
 
-    std::size_t nb_threads = 1;
-#pragma omp parallel
-    { nb_threads = omp_get_num_threads(); }
-    std::cout << "Number threads: " << nb_threads << std::endl;
-    std::size_t nb_doe = 1;
     std::cout << "Number DOE: " << nb_doe << std::endl;
     // Run simulated annealing with different initial solutions, one for each thread
     std::vector<std::vector<double>> initial_solutions(nb_doe);
@@ -355,26 +350,27 @@ void MainSimulatedAnnealingSPAD() {
 
     std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
-    // #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
-    for (std::size_t i = 0; i < nb_doe; i++) {
-        std::string directory        = fmt::format("{}/thread_{}/", DIR_RES, i);
-        sa_options.m_prefix_name_log = directory;
+#pragma omp parallel for 
+    for (std::size_t idx_doe = 0; idx_doe < nb_doe; idx_doe++) {
+        std::string directory        = fmt::format("{}/thread_{}/", DIR_RES, idx_doe);
+        SimulatedAnnealOptions spec_sa_options(sa_options);
+        spec_sa_options.m_prefix_name_log = directory;
         std::filesystem::create_directories(directory);
-        SimulatedAnnealing  sa(sa_options, cost_function_wrapper);
+        SimulatedAnnealing  sa(spec_sa_options, cost_function_wrapper);
         std::vector<double> initial_solution = random_initial_position(min_values, max_values);
         sa.set_initial_solution(initial_solution);
         sa.run();
 
-        // #pragma omp critical
+#pragma omp critical
         {
             // Save best solution
             sa.export_history();
             std::vector<double> best_solution = sa.get_best_solution();
             double              best_cost     = sa.get_best_cost();
-            final_solutions[i]                = best_solution;
-            final_costs[i]                    = best_cost;
+            final_solutions[idx_doe]                = best_solution;
+            final_costs[idx_doe]                    = best_cost;
             // Save all solutions
-            histories[i] = sa.get_history();
+            histories[idx_doe] = sa.get_history();
         }
     }
 

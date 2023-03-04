@@ -17,8 +17,18 @@
 
 int main(int argc, const char** argv) {
     // Simulated annealing
+    // Parse command line arguments (NbDOE, NbIterMax)
+    std::size_t nb_doe = 8;
+    std::size_t nb_iter_max  = 100;
+    if (argc == 3) {
+        nb_doe = std::stoul(argv[1]);
+        nb_iter_max  = std::stoul(argv[2]);
+    } else {
+        fmt::print("Usage: {} NbDOE NbIterMax \n", argv[0]);
+        fmt::print("Using default values: NbDOE = {}, NbIterMax = {} \n", nb_doe, nb_iter_max);
+    }
     auto start = std::chrono::high_resolution_clock::now();
-    Optimization::MainSimulatedAnnealingSPAD();
+    Optimization::MainSimulatedAnnealingSPAD(nb_doe, nb_iter_max);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     fmt::print("Total time : {} s \n\n", elapsed_seconds.count());

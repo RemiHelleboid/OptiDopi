@@ -176,5 +176,6 @@ void SimulatedAnnealing::run() {
 
 void SimulatedAnnealing::export_history() {
     std::string filename = m_options.m_prefix_name_log + "history_optimization.csv";
+    std::cout << "EXPORT DIRECTORY: " << filename << std::endl;
     m_history.export_to_csv(filename);
 }

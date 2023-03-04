@@ -210,6 +210,9 @@ void ParticleSwarm::optimize() {
                                  m_best_fitness,
                                  mean_distance)
                   << std::flush;
+        if (m_current_iteration%10 == 0) {
+            std::cout << "\n";
+        }
     }
 
     std::cout << std::endl;
