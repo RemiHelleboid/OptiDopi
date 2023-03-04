@@ -8,6 +8,7 @@
 #include <fmt/xchar.h>
 
 #include <filesystem>
+#include <memory>
 #include <numeric>
 
 #include "Device1D.hpp"
@@ -94,9 +95,9 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     parameters_admc.m_temperature                = temperature;
     parameters_admc.m_activate_impact_ionization = true;
     parameters_admc.m_activate_particle_creation = true;
-    parameters_admc.m_max_particles              = 1000;
+    parameters_admc.m_max_particles              = 200;
     parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
-    std::size_t nb_simulation_per_point          = 50;
+    std::size_t nb_simulation_per_point          = 10;
     std::size_t NbPointsX                        = 100;
 
     // File to export the best path figures (BV, BrP, DW, ...)
@@ -104,6 +105,10 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     best_path_file << "Iteration,BV,BrP,DW,Cost" << std::endl;
 
     const std::string poisson_dir = fmt::format("{}/poisson_res/", dirname);
+
+    std::vector<std::size_t> iter_to_save_for_jitter = {0, 10, 50, 100};
+    std::vector<std::unique_ptr<Device1D>> saved_devices(iter_to_save_for_jitter.size());
+    std::vector<double>                    saved_BV(iter_to_save_for_jitter.size());
 
 #pragma omp parallel for schedule(static)
     for (std::size_t i = 0; i < best_path.size(); ++i) {
@@ -114,16 +119,16 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         std::vector<double> acceptor_levels(best_path[i].size() - 2);
         std::vector<double> acceptor_levels_log(best_path[i].begin() + 2, best_path[i].end());
         std::transform(best_path[i].begin() + 2, best_path[i].end(), acceptor_levels.begin(), [](double x) { return pow(10, x); });
-        Device1D my_device;
-        my_device.set_up_complex_diode(x_length,
-                                       nb_points,
-                                       donor_length,
-                                       intrinsic_length,
-                                       donor_level,
-                                       intrinsic_level,
-                                       acceptor_x,
-                                       acceptor_levels);
-        my_device.smooth_doping_profile(DopSmooth);
+        std::unique_ptr<Device1D> my_device = std::make_unique<Device1D>();
+        my_device->set_up_complex_diode(x_length,
+                                        nb_points,
+                                        donor_length,
+                                        intrinsic_length,
+                                        donor_level,
+                                        intrinsic_level,
+                                        acceptor_x,
+                                        acceptor_levels);
+        my_device->smooth_doping_profile(DopSmooth);
 
         // Solve the Poisson and McIntyre equations
         double       target_anode_voltage  = 30.0;
@@ -133,33 +138,47 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         const double stop_above_bv         = 5.0;
         double       BiasAboveBV           = 3.0;
 
-        my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
-        bool poisson_success = my_device.get_poisson_success();
+        my_device->solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
+        bool poisson_success = my_device->get_poisson_success();
         if (!poisson_success) {
             fmt::print("Poisson failed\n");
         }
         double               time        = i / static_cast<double>(best_path.size());
-        cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time);
+        cost_function_result cost_result = my_device->compute_cost_function(BiasAboveBV, time);
         double               BV          = cost_result.result.BV;
         double               BRP         = cost_result.result.BrP;
         double               DW          = cost_result.result.DW;
         double               cost        = cost_result.total_cost;
         fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
 
-        if (i == 0 || i == 10 || i == 50 || i == best_path.size() - 1) {
-            double            voltage_AMDC = BV + BiasAboveBV;
-            const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
-            my_device.DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
-        }
 
 #pragma omp critical
         {
-            my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
+            my_device->export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
             // my_device.export_poisson_solution_at_voltage(BV + BiasAboveBV, poisson_dir, fmt::format("poisson_{}_", i));
             const std::string poisson_dir_iter = fmt::format("{}/poisson_res_{:03d}", dirname, i);
             std::filesystem::create_directories(poisson_dir_iter);
-            my_device.export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i), voltage_step_export);
+            my_device->export_poisson_solution(poisson_dir_iter, fmt::format("poisson_{}_", i), voltage_step_export);
+
+            // Save the device for the jitter computation.
+            for (std::size_t j = 0; j < iter_to_save_for_jitter.size(); ++j) {
+                if (i == iter_to_save_for_jitter[j]) {
+                    saved_devices[j] = std::move(my_device);
+                    saved_BV[j]      = BV;
+                }
+            }
         }
+    }
+    // Compute Jitter for the saved devices.
+    std::cout << std::endl;
+    std::cout << "Computing jitter" << std::endl;
+    for (std::size_t i = 0; i < saved_devices.size(); ++i) {
+        std::cout << "Computing jitter for iteration " << i << " / " << saved_devices.size() << std::endl;
+        double            BV           = saved_BV[i];
+        double            BiasAboveBV  = 3.0;
+        double            voltage_AMDC = BV + BiasAboveBV;
+        const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
+        saved_devices[i]->DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
     }
 }
 
