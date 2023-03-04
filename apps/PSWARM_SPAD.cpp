@@ -28,7 +28,7 @@ int main(int argc, const char** argv) {
     const double w  = 0.9;
 
     auto start = std::chrono::high_resolution_clock::now();
-    Optimization::MainParticleSwarmSPAD(nb_particles, nb_iter_max, c1, c2, w);
+    Optimization::MainParticleSwarmSPAD(nb_particles, nb_iter_max, w, c1, c2);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     fmt::print("Total time : {:.3f} s \n\n", elapsed_seconds.count());

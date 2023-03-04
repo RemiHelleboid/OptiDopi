@@ -79,6 +79,7 @@ void ParticleSwarm::initialize_particles() {
             m_particles[idx_particle].velocity[i] =
                 -range + 2.0 * range * m_uniform_distribution(m_particles[idx_particle].get_random_engine());
         }
+
         m_particles[idx_particle].best_position = m_particles[idx_particle].position;
         std::vector<double> params              = {static_cast<double>(m_current_iteration), static_cast<double>(m_max_iterations)};
         m_particles[idx_particle].best_fitness  = m_fitness_function(m_particles[idx_particle].position, params);
