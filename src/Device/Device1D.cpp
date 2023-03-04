@@ -132,7 +132,8 @@ void Device1D::export_poisson_at_voltage_3D_emulation(double             voltage
         for (std::size_t idx_y = 0; idx_y < y_line_micron.size(); ++idx_y) {
             for (std::size_t idx_z = 0; idx_z < z_line_micron.size(); ++idx_z) {
                 file << x_line_micron[idx_x] << "," << y_line_micron[idx_y] << "," << z_line_micron[idx_z] << "," << phi[idx_x] << ","
-                     << n[idx_x] << "," << p[idx_x] << "," << electric_field[idx_x] << "," << m_doping_profile.get_doping_concentration()[idx_x] << std::endl;
+                     << n[idx_x] << "," << p[idx_x] << "," << electric_field[idx_x] << ","
+                     << m_doping_profile.get_doping_concentration()[idx_x] << std::endl;
             }
         }
     }
@@ -305,4 +306,12 @@ cost_function_result Device1D::compute_cost_function(double voltage_above_breakd
     result.BrP = BreakdownProbability;
     result.DW  = DepletionWidth;
     return {result, BV_cost, BP_cost, DW_cost, cost};
+}
+
+void Device1D::DeviceADMCSimulation(const ADMC::ParametersADMC& parameters,
+                                    double                      voltage,
+                                    std::size_t                 nb_simulation_per_points,
+                                    std::size_t                 nbXPoints,
+                                    const std::string&          export_name) {
+    ADMC::MainFullADMCSimulation(parameters, *this, voltage, nb_simulation_per_points, nbXPoints, export_name);
 }

@@ -47,7 +47,7 @@ double intermediate_cost_function(double donor_length, double log_donor_level, s
 
 double cost_function(std::vector<double> variables);
 
-void MainParticleSwarmSPAD();
+void MainParticleSwarmSPAD(std::size_t nb_particles, std::size_t max_iter, double w, double c1, double c2);
 
 void MainSimulatedAnnealingSPAD();
 

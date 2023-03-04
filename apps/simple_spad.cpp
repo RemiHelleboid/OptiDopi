@@ -18,13 +18,13 @@
 int main(int argc, char** argv) {
     auto start = std::chrono::high_resolution_clock::now();
     std::size_t number_points    = 400;
-    double      total_length     = 10.0;
-    double      length_donor     = 1.0;
+    double      total_length     = 5.0;
+    double      length_donor     = 0.25;
     double      doping_donor     = 5.0e19;
     double      doping_intrinsic = 1.0e13;
     double      length_intrinsic = 0.0;
 
-    double doping_acceptor = 1.0e16;
+    double doping_acceptor = 2.0e16;
 
     Device1D my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 
     fmt::print("Start Advection Diffusion Monte Carlo\n");
     double       temperature = 300.0;
-    double       time_step   = 1.0e-13;
+    double       time_step   = 5.0e-14;
     double       final_time  = 5.0e-9;
 
     ADMC::ParametersADMC parameters_admc;
@@ -76,8 +76,10 @@ int main(int argc, char** argv) {
     // simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
     // simulation_admc.RunSimulation();
 
-    std::size_t nb_simulation_per_point = 100;
-    ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point);
+    std::size_t nb_simulation_per_point = 20;
+    std::size_t NbPointsX = 100;
+    // ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX);
+    my_device.DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, fmt::format("SimpleSPAD_{:.2f}_",voltage_AMDC));
     
 
     auto end = std::chrono::high_resolution_clock::now();

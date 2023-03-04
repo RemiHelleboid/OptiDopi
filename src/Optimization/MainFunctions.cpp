@@ -10,14 +10,14 @@
 #include <filesystem>
 #include <numeric>
 
+#include "Device1D.hpp"
+#include "DopingProfile1D.hpp"
 #include "Functions.hpp"
 #include "ImpactIonization.hpp"
 #include "OptimStruct.hpp"
 #include "ParticleSwarm.hpp"
 #include "PoissonSolver1D.hpp"
 #include "SimulatedAnneal.hpp"
-#include "Device1D.hpp"
-#include "DopingProfile1D.hpp"
 #include "fill_vector.hpp"
 #include "omp.h"
 
@@ -84,6 +84,20 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     std::size_t nb_points           = NBPOINTS;
     double      intrinsic_length    = 0.0;
     double      voltage_step_export = 0.5;
+    // ADMC parameters
+    double               temperature = 300.0;
+    double               time_step   = 5.0e-14;
+    double               final_time  = 5.0e-9;
+    ADMC::ParametersADMC parameters_admc;
+    parameters_admc.m_time_step                  = time_step;
+    parameters_admc.m_max_time                   = final_time;
+    parameters_admc.m_temperature                = temperature;
+    parameters_admc.m_activate_impact_ionization = true;
+    parameters_admc.m_activate_particle_creation = true;
+    parameters_admc.m_max_particles              = 1000;
+    parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
+    std::size_t nb_simulation_per_point          = 50;
+    std::size_t NbPointsX                        = 100;
 
     // File to export the best path figures (BV, BrP, DW, ...)
     std::ofstream best_path_file(dirname + "/SPAD_figures_best_path.csv");
@@ -131,6 +145,13 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
         double               DW          = cost_result.result.DW;
         double               cost        = cost_result.total_cost;
         fmt::print(best_path_file, "{},{:.2f},{:.2f},{:.2e},{:.2f}\n", i, BV, BRP, DW, cost);
+
+        if (i == 0 || i == 10 || i == 50 || i == best_path.size() - 1) {
+            double            voltage_AMDC = BV + BiasAboveBV;
+            const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
+            my_device.DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
+        }
+
 #pragma omp critical
         {
             my_device.export_doping_profile(fmt::format("{}/doping_profile_{:03d}.csv", dirname, i));
@@ -220,7 +241,7 @@ std::function<double(std::vector<double>, const std::vector<double>&)> cost_func
  * @brief Main function for the Particle Swarm Optimization.
  *
  */
-void MainParticleSwarmSPAD() {
+void MainParticleSwarmSPAD(std::size_t nb_particles, std::size_t max_iter, double w, double c1, double c2) {
     const std::string timestamp = fmt::format("{:%Y-%m-%d_%H-%M-%S}", fmt::localtime(std::time(nullptr)));
     const std::string DIR_RES   = fmt::format("results_pso/{}/", timestamp);
     if (!std::filesystem::exists(DIR_RES)) {
@@ -243,17 +264,7 @@ void MainParticleSwarmSPAD() {
     std::vector<double> max_values(nb_parameters);
     set_up_bounds(min_length_donor, max_length_donor, donor_min_doping, donor_max_doping, min_doping, max_doping, min_values, max_values);
 
-    std::size_t nb_threads = 1;
-#pragma omp parallel
-    { nb_threads = omp_get_num_threads(); }
-    std::cout << "Number threads: " << nb_threads << std::endl;
-
-    std::size_t max_iter         = ITER_MAX;
-    double      c1               = 3.5;
-    double      c2               = 1.5;
-    double      w                = 0.9;
-    double      velocity_scaling = 0.1;
-    std::size_t nb_particles     = 10 * nb_threads;
+    double velocity_scaling = 0.1;
     std::cout << "Number particles: " << nb_particles << std::endl;
     Optimization::ParticleSwarm pso(max_iter, nb_particles, nb_parameters, cost_function_wrapper);
     pso.set_dir_export(DIR_RES);
@@ -325,7 +336,7 @@ void MainSimulatedAnnealingSPAD() {
 
     std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
-// #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
+    // #pragma omp parallel for schedule(dynamic) num_threads(nb_threads)
     for (std::size_t i = 0; i < nb_doe; i++) {
         std::string directory        = fmt::format("{}/thread_{}/", DIR_RES, i);
         sa_options.m_prefix_name_log = directory;
@@ -335,7 +346,7 @@ void MainSimulatedAnnealingSPAD() {
         sa.set_initial_solution(initial_solution);
         sa.run();
 
-// #pragma omp critical
+        // #pragma omp critical
         {
             // Save best solution
             sa.export_history();

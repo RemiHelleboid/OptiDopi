@@ -16,6 +16,7 @@
 #include <random>
 #include <vector>
 
+#include "AdvectionDiffusionMC.hpp"
 #include "DopingProfile1D.hpp"
 #include "McIntyre.hpp"
 #include "PoissonSolver1D.hpp"
@@ -63,6 +64,7 @@ struct cost_function_result {
 
 class Device1D {
  private:
+    std::string    m_name;
     doping_profile m_doping_profile;
 
     NewtonPoissonSolver m_poisson_solver;
@@ -75,12 +77,14 @@ class Device1D {
     std::vector<mcintyre::McIntyreSolution> m_list_mcintyre_solutions;
 
  public:
-    Device1D()  = default;
-    Device1D(const Device1D&) = default;
-    Device1D(Device1D&&)      = default;
+    Device1D()                           = default;
+    Device1D(const Device1D&)            = default;
+    Device1D(Device1D&&)                 = default;
     Device1D& operator=(const Device1D&) = default;
+    ~Device1D()                          = default;
 
-    ~Device1D() = default;
+    void               set_name(const std::string& name) { m_name = name; }
+    const std::string& get_name() const { return m_name; }
 
     const doping_profile& get_doping_profile() const { return m_doping_profile; }
 
@@ -105,12 +109,18 @@ class Device1D {
     void export_doping_profile(const std::string& filename) const { m_doping_profile.export_doping_profile(filename); }
     void smooth_doping_profile(int window_size);
 
-    void solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
-    bool get_poisson_success() const { return m_poisson_solver.get_solver_success(); }
-    void export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
-    void export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const;
-    void export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const;
-    void export_poisson_at_voltage_3D_emulation(double voltage, const std::string& directory_name, const std::string& prefix, double DY, double DZ, std::size_t NY, std::size_t NZ) const;
+    void            solve_poisson(const double final_anode_voltage, const double tolerance, const int max_iterations);
+    bool            get_poisson_success() const { return m_poisson_solver.get_solver_success(); }
+    void            export_poisson_solution(const std::string& directory_name, const std::string& prefix) const;
+    void            export_poisson_solution(const std::string& directory_name, const std::string& prefix, double voltage_step) const;
+    void            export_poisson_solution_at_voltage(double voltage, const std::string& directory_name, const std::string& prefix) const;
+    void            export_poisson_at_voltage_3D_emulation(double             voltage,
+                                                           const std::string& directory_name,
+                                                           const std::string& prefix,
+                                                           double             DY,
+                                                           double             DZ,
+                                                           std::size_t        NY,
+                                                           std::size_t        NZ) const;
     PoissonSolution get_poisson_solution_at_voltage(double voltage) const;
 
     const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }
@@ -133,4 +143,10 @@ class Device1D {
     double get_depletion_at_voltage(double voltage) const;
 
     cost_function_result compute_cost_function(double voltage_above_breakdown, double time) const;
+
+    void DeviceADMCSimulation(const ADMC::ParametersADMC& parameters,
+                              double                      voltage,
+                              std::size_t                 nb_simulation_per_points,
+                              std::size_t                 nbXPoints,
+                              const std::string&          export_name);
 };

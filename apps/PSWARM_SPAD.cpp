@@ -13,8 +13,22 @@
 #include "MainFunctions.hpp"
 
 int main(int argc, const char** argv) {
+    // Parse command line arguments (NbParticles, NbIterMax)
+    std::size_t nb_particles = 8;
+    std::size_t nb_iter_max  = 100;
+    if (argc == 3) {
+        nb_particles = std::stoul(argv[1]);
+        nb_iter_max  = std::stoul(argv[2]);
+    } else {
+        fmt::print("Usage: {} NbParticles NbIterMax \n", argv[0]);
+        fmt::print("Using default values: NbParticles = {}, NbIterMax = {} \n", nb_particles, nb_iter_max);
+    }
+    const double c1 = 3.5;
+    const double c2 = 1.5;
+    const double w  = 0.9;
+
     auto start = std::chrono::high_resolution_clock::now();
-    Optimization::MainParticleSwarmSPAD();
+    Optimization::MainParticleSwarmSPAD(nb_particles, nb_iter_max, c1, c2, w);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     fmt::print("Total time : {:.3f} s \n\n", elapsed_seconds.count());

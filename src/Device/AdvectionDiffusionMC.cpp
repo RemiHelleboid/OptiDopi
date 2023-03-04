@@ -22,33 +22,31 @@
 #include <string>
 #include <vector>
 
-#include "Mobility.hpp"
+#include "Device1D.hpp"
 #include "Mobility.hpp"
 #include "fill_vector.hpp"
+#include "interpolation.hpp"
 
 namespace ADMC {
 
-SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D& myDevice)
+SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D& myDevice, double voltage)
     : m_parameters(parameters),
       m_device(myDevice),
       m_x_line(myDevice.get_doping_profile().get_x_line()),
       m_doping(myDevice.get_doping_profile().get_doping_concentration()),
-      m_ElectricField(m_x_line.size()),
+      m_ElectricField(m_device.get_poisson_solution_at_voltage(voltage).m_electric_field),
       m_eVelocity(m_x_line.size()),
       m_hVelocity(m_x_line.size()) {
     m_particles.reserve(m_parameters.m_max_particles);
+
+    if (m_ElectricField.size() != m_x_line.size()) {
+        throw std::runtime_error("The size of the electric field vector is not the same as the size of the x_line vector.");
+    }
 
     std::random_device rd;
     m_generator.seed(rd());
     m_distribution_uniform = std::uniform_real_distribution<double>(0.0, 1.0);
     m_distribution_normal  = std::normal_distribution<double>(0.0, 1.0);
-}
-
-void SimulationADMC::set_electric_field(double voltage) {
-    m_ElectricField = m_device.get_poisson_solution_at_voltage(voltage).m_electric_field;
-    if (m_ElectricField.size() != m_x_line.size()) {
-        throw std::runtime_error("The size of the electric field vector is not the same as the size of the x_line vector.");
-    }
 }
 
 void SimulationADMC::AddElectrons(std::size_t number_of_electrons) {
@@ -101,15 +99,28 @@ void SimulationADMC::AddHoles(std::size_t number_of_holes, const Vector3& positi
     }
 }
 
+// void SimulationADMC::SetDataFromDeviceStep() {
+//     // Set doping and electric field
+//     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
+//         std::size_t idx_x = 0;
+//         while (m_particles[idx_part].position().x() > m_x_line[idx_x]) {
+//             ++idx_x;
+//         }
+//         m_particles[idx_part].set_doping(m_doping[idx_x]);
+//         m_particles[idx_part].set_electric_field({m_ElectricField[idx_x], 0.0, 0.0});
+//         m_particles[idx_part].compute_mobility();
+//         m_particles[idx_part].compute_velocity();
+//     }
+// }
+
 void SimulationADMC::SetDataFromDeviceStep() {
     // Set doping and electric field
+    std::vector<double> x_positions               = this->get_all_x_positions();
+    std::vector<double> InterpolatedDoping        = Utils::interp1dSorted(m_x_line, m_doping, x_positions);
+    std::vector<double> InterpolatedElectricField = Utils::interp1dSorted(m_x_line, m_ElectricField, x_positions);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
-        std::size_t idx_x = 0;
-        while (m_particles[idx_part].position().x() > m_x_line[idx_x]) {
-            ++idx_x;
-        }
-        m_particles[idx_part].set_doping(m_doping[idx_x]);
-        m_particles[idx_part].set_electric_field({m_ElectricField[idx_x], 0.0, 0.0});
+        m_particles[idx_part].set_doping(InterpolatedDoping[idx_part]);
+        m_particles[idx_part].set_electric_field({InterpolatedElectricField[idx_part], 0.0, 0.0});
         m_particles[idx_part].compute_mobility();
         m_particles[idx_part].compute_velocity();
     }
@@ -125,12 +136,10 @@ void SimulationADMC::PerformDriftDiffusionStep() {
 }
 
 void SimulationADMC::PerformImpactIonizationStep() {
-    std::size_t nb_particle                    = m_particles.size();
-    bool        at_least_one_impact_ionization = false;
+    std::size_t nb_particle = m_particles.size();
     for (std::size_t idx_part = 0; idx_part < nb_particle; ++idx_part) {
         m_particles[idx_part].perform_impact_ionization_step(m_parameters.m_time_step);
         if (m_particles[idx_part].has_impact_ionized()) {
-            at_least_one_impact_ionization = true;
             m_history.m_all_impact_ionization_positions.push_back(m_particles[idx_part].position());
             std::size_t index_new_particles   = m_particles.size();
             double      new_r_parent_particle = m_distribution_uniform(m_generator);
@@ -152,14 +161,14 @@ void SimulationADMC::PerformImpactIonizationStep() {
 
 void SimulationADMC::CheckContactCrossing() {
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
-        if (m_particles[idx_part].position().x() < 0 || m_particles[idx_part].position().x() > m_device.get_doping_profile().get_x_line().back()) {
+        if (m_particles[idx_part].position().x() < 0 || m_particles[idx_part].position().x() > m_x_line.back()) {
             m_particles[idx_part].set_crossed_contact(true);
         }
     }
     // Remove particles that have crossed the contact
-    m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(), [](const Particle& p) { return p.crossed_contact();}), m_particles.end());
+    m_particles.erase(std::remove_if(m_particles.begin(), m_particles.end(), [](const Particle& p) { return p.crossed_contact(); }),
+                      m_particles.end());
 }
-
 
 void SimulationADMC::RunSimulation() {
     m_time = 0.0;
@@ -177,7 +186,7 @@ void SimulationADMC::RunSimulation() {
     } else if (m_particles.size() >= m_parameters.m_max_particles || m_particles.size() >= m_parameters.m_avalanche_threshold) {
         m_history.m_has_reached_avalanche = true;
         m_history.m_avalanche_time        = m_time;
-        // std::cout << "Avalanche!" << std::endl;  
+        // std::cout << "Avalanche!" << std::endl;
     } else {
         // std::cout << "Maximum time reached, simulation stopped" << std::endl;
     }
@@ -214,12 +223,12 @@ void SimulationADMC::ExportCurrentState() const {
 void MainFullADMCSimulation(const ParametersADMC& parameters,
                             const Device1D&       device,
                             double                voltage,
-                            std::size_t           nb_simulation_per_points) {
-    std::size_t         nb_points_x = device.get_doping_profile().get_x_line().size();
+                            std::size_t           nb_simulation_per_points,
+                            std::size_t           nbPointsX,
+                            const std::string&    export_name) {
     double x_max = device.get_doping_profile().get_x_line().back();
 
-    std::size_t NXpoints = 250;
-    std::vector<double> x_line = utils::linspace(0.0, x_max, NXpoints);
+    std::vector<double> x_line = utils::linspace(0.0, x_max, nbPointsX);
 
     std::vector<double> all_avalanche_times;
     std::vector<double> eBreakdownRatio(x_line.size(), 0.0);
@@ -232,9 +241,8 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         std::vector<double> eBreakdownRatio_point;
         int                 nb_avalanches_point = 0;
         for (std::size_t idx_sim = 0; idx_sim < nb_simulation_per_points; ++idx_sim) {
-            SimulationADMC simulation(parameters, device);
+            SimulationADMC simulation(parameters, device, voltage);
             simulation.AddElectrons(1, {x_line[idx_x], 0.5, 0.5});
-            simulation.set_electric_field(voltage);
             simulation.RunSimulation();
             if (simulation.get_history().m_has_reached_avalanche) {
                 avalanche_times_point.push_back(simulation.get_history().m_avalanche_time);
@@ -246,19 +254,25 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         eBreakdownRatio[idx_x] = ratio;
         // Add the avalanche times to the global vector
 #pragma omp critical
-        {
-            all_avalanche_times.insert(all_avalanche_times.end(), avalanche_times_point.begin(), avalanche_times_point.end());
-        }
+        { all_avalanche_times.insert(all_avalanche_times.end(), avalanche_times_point.begin(), avalanche_times_point.end()); }
     }
     double ratio = static_cast<double>(nb_avalanches) / static_cast<double>(nb_simulation_per_points * x_line.size());
     std::cout << "Avalanche Breakdown ratio: " << ratio << std::endl;
     // Export the avalanche times to a file
-    std::ofstream file_avalanche_times(parameters.m_output_file + "AvalancheTimes.csv");
+    std::ofstream file_avalanche_times(export_name + "AvalancheTimes.csv");
     file_avalanche_times << "TimeAvalanche" << std::endl;
     for (const auto& time : all_avalanche_times) {
         file_avalanche_times << time << std::endl;
     }
     file_avalanche_times.close();
+
+    // Export the breakdown ratio to a file
+    std::ofstream file_breakdown_ratio(export_name + "BreakdownProbability.csv");
+    file_breakdown_ratio << "X,BreakdownRatio" << std::endl;
+    for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
+        file_breakdown_ratio << x_line[idx_x] << "," << eBreakdownRatio[idx_x] << std::endl;
+    }
+    file_breakdown_ratio.close();
 }
 
 // void ExportAllParticlesHistory() const;

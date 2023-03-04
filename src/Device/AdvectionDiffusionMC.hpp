@@ -16,11 +16,12 @@
 #include <string>
 #include <vector>
 
-#include "Device1D.hpp"
 #include "ImpactIonization.hpp"
 #include "Mobility.hpp"
 #include "ParticleAdvectionDiffusionMC.hpp"
 #include "Vector3.hpp"
+
+class Device1D;
 
 namespace ADMC {
 
@@ -77,7 +78,7 @@ class SimulationADMC {
     ADMCSimulationHistory m_history;
 
  public:
-    SimulationADMC(const ParametersADMC& parameters, const Device1D& device);
+    SimulationADMC(const ParametersADMC& parameters, const Device1D& device, double voltage);
 
     const ADMCSimulationHistory& get_history() const { return m_history; }
     double                       get_time() const { return m_history.m_time.back(); }
@@ -145,11 +146,25 @@ class SimulationADMC {
         });
     }
 
+    std::vector<double> get_all_x_positions() const {
+        std::vector<double> positions;
+        positions.reserve(m_particles.size());
+        for (const auto& particle : m_particles) {
+            positions.push_back(particle.position().x());
+        }
+        return positions;
+    }
+
     void ExportCurrentState() const;
     void ExportSimulationHistory() const;
     void ExportAllParticlesHistory() const;
 };
 
-void MainFullADMCSimulation(const ParametersADMC& parameters, const Device1D& device, double voltage, std::size_t nb_simulation_per_points);
+void MainFullADMCSimulation(const ParametersADMC& parameters,
+                            const Device1D&       device,
+                            double                voltage,
+                            std::size_t           nb_simulation_per_points,
+                            std::size_t           nbPointsX,
+                            const std::string&    export_name);
 
 }  // namespace ADMC
