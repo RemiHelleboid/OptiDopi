@@ -33,3 +33,7 @@ target_link_libraries(PSWARM_SPAD.x libdevice libutils liboptim)
 add_executable(SA_SPAD.x SA_SPAD.cpp)
 target_link_libraries(SA_SPAD.x fmt::fmt OpenMP::OpenMP_CXX)
 target_link_libraries(SA_SPAD.x libdevice libutils liboptim)
+
+add_executable(DATAGEN.x DatasetCreator.cpp)
+target_link_libraries(DATAGEN.x fmt::fmt OpenMP::OpenMP_CXX)
+target_link_libraries(DATAGEN.x libdevice libutils liboptim)

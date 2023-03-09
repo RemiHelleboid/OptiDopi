@@ -46,6 +46,9 @@ struct ParametersADMC {
     double m_y_width = 1.0;
     double m_z_width = 1.0;
 
+    double m_x_anode;
+    double m_x_cathode;
+
     std::size_t m_avalanche_threshold;
     std::size_t m_max_particles;
 

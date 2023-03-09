@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "fill_vector.hpp"
+#include "interpolation.hpp"
 #include "smoother.hpp"
 
 std::pair<double, double> exponential_link_parameters(double x0, double x1, double y0, double y1) {
@@ -61,7 +62,7 @@ void doping_profile::set_up_pin_diode(double      x_min,
                                       double      length_intrinsic,
                                       double      donor_level,
                                       double      acceptor_level,
-                                      double      intrisic_level) {
+                                      double      intrinsic_level) {
     m_x_line = utils::linspace(x_min, x_max, number_points);
     m_donor_concentration.clear();
     m_acceptor_concentration.clear();
@@ -74,7 +75,7 @@ void doping_profile::set_up_pin_diode(double      x_min,
             m_donor_concentration[index_x]    = donor_level;
             m_acceptor_concentration[index_x] = 0.0;
         } else if (x_position <= length_donor + length_intrinsic) {
-            m_donor_concentration[index_x]    = intrisic_level;
+            m_donor_concentration[index_x]    = intrinsic_level;
             m_acceptor_concentration[index_x] = 0.0;
         } else {
             m_donor_concentration[index_x]    = 0.0;
@@ -89,7 +90,7 @@ void doping_profile::set_up_advanced_pin(double              xlength,
                                          double              length_donor,
                                          double              length_intrinsic,
                                          double              donor_level,
-                                         double              intrisic_level,
+                                         double              intrinsic_level,
                                          std::vector<double> list_x_acceptor,
                                          std::vector<double> list_acceptor_level) {
     if (list_x_acceptor.size() != list_acceptor_level.size()) {
@@ -110,10 +111,10 @@ void doping_profile::set_up_advanced_pin(double              xlength,
         double x_position = m_x_line[index_x];
         if (x_position <= length_donor) {
             m_donor_concentration[index_x]    = donor_level;
-            m_acceptor_concentration[index_x] = 0.0;
+            m_acceptor_concentration[index_x] = intrinsic_level;
         } else if (x_position <= length_donor + length_intrinsic) {
-            m_donor_concentration[index_x]    = intrisic_level;
-            m_acceptor_concentration[index_x] = 0.0;
+            m_donor_concentration[index_x]    = intrinsic_level;
+            m_acceptor_concentration[index_x] = intrinsic_level;
         } else {
             break;
         }
@@ -132,10 +133,39 @@ void doping_profile::set_up_advanced_pin(double              xlength,
             double x_position = m_x_line[index_x];
             if (x_position >= x_init && x_position <= x_end) {
                 m_acceptor_concentration[index_x] = exponential_link(x_position, alpha, beta);
+                m_donor_concentration[index_x]    = intrinsic_level;
             }
         }
     }
     re_compute_total_doping();
+}
+
+std::vector<double> doping_profile::get_acceptor_concentration_cm3(std::size_t number_points) const {
+    // Return a sampling of the acceptor concentration profile
+    std::vector<double> x_line                 = utils::linspace(0.0, m_x_line.back(), number_points);
+    std::vector<double> log_acceptors(m_x_line.size());
+    for (std::size_t idx = 0; idx < m_x_line.size(); ++idx) {
+        log_acceptors[idx] = std::log(m_acceptor_concentration[idx]);
+    }
+    std::vector<double> acceptor_concentration = Utils::interp1dSorted(m_x_line, log_acceptors, x_line);
+    for (std::size_t idx = 0; idx < x_line.size(); ++idx) {
+        acceptor_concentration[idx] = std::exp(acceptor_concentration[idx]);
+    }
+    return acceptor_concentration;
+}
+
+std::vector<double> doping_profile::get_donor_concentration_cm3(std::size_t number_points) const {
+    // Return a sampling of the donor concentration profile
+    std::vector<double> x_line              = utils::linspace(0.0, m_x_line.back(), number_points);
+    std::vector<double> log_donors(m_x_line.size());
+    for (std::size_t idx = 0; idx < m_x_line.size(); ++idx) {
+        log_donors[idx] = std::log(m_donor_concentration[idx]);
+    }
+    std::vector<double> donor_concentration = Utils::interp1dSorted(m_x_line, log_donors, x_line);
+    for (std::size_t idx = 0; idx < x_line.size(); ++idx) {
+        donor_concentration[idx] = std::exp(donor_concentration[idx]);
+    }
+    return donor_concentration;
 }
 
 void doping_profile::export_doping_profile(const std::string& filename) const {

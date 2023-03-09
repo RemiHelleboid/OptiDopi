@@ -37,6 +37,9 @@ class doping_profile {
     std::vector<double> get_donor_concentration() const { return m_donor_concentration; }
     std::vector<double> get_doping_concentration() const { return m_doping_concentration; }
 
+    std::vector<double> get_acceptor_concentration_cm3(std::size_t number_points) const;
+    std::vector<double> get_donor_concentration_cm3(std::size_t number_points) const;
+
     void re_compute_total_doping();
     void set_up_pin_diode(double      x_min,
                           double      x_max,
