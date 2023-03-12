@@ -170,17 +170,18 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
             }
         }
     }
+    best_path_file.close();
     // Compute Jitter for the saved devices.
-    std::cout << std::endl;
-    std::cout << "Computing jitter" << std::endl;
-    for (std::size_t i = 0; i < saved_devices.size(); ++i) {
-        std::cout << "Computing jitter for iteration " << i << " / " << saved_devices.size() << std::endl;
-        double            BV           = saved_BV[i];
-        double            BiasAboveBV  = 3.0;
-        double            voltage_AMDC = BV + BiasAboveBV;
-        const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
-        saved_devices[i]->DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
-    }
+    // std::cout << std::endl;
+    // std::cout << "Computing jitter" << std::endl;
+    // for (std::size_t i = 0; i < saved_devices.size(); ++i) {
+    //     std::cout << "Computing jitter for iteration " << i << " / " << saved_devices.size() << std::endl;
+    //     double            BV           = saved_BV[i];
+    //     double            BiasAboveBV  = 3.0;
+    //     double            voltage_AMDC = BV + BiasAboveBV;
+    //     const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
+    //     saved_devices[i]->DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
+    // }
 }
 
 double intermediate_cost_function(double              donor_length,
