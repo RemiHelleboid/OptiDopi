@@ -83,6 +83,13 @@ if(NOT Eigen3_FOUND)
   FetchContent_MakeAvailable(Eigen)
 endif()
 
+FetchContent_Declare(
+  DocTest
+  GIT_REPOSITORY "https://github.com/onqtam/doctest"
+  GIT_TAG "4d8716f1efc1d14aa736ef52ee727bd4204f4c40"
+)
+FetchContent_MakeAvailable(DocTest)
+
 # Find OpenMP
 find_package(OpenMP REQUIRED)
 
@@ -107,3 +114,4 @@ add_subdirectory(src/Utils)
 add_subdirectory(src/Device)
 add_subdirectory(src/Optimization)
 add_subdirectory(apps/)
+add_subdirectory(tests/)

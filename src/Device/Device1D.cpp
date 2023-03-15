@@ -20,6 +20,13 @@
 
 void Device1D::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
 
+
+void Device1D::setup_constant_device(double x_length, std::size_t number_points, double doping_acceptor, double doping_donor){
+
+}
+
+
+
 void Device1D::setup_pin_diode(double      xlenght,
                                std::size_t number_points,
                                double      length_donor,

@@ -30,6 +30,7 @@ struct ParticleHistory {
     std::vector<Vector3> m_velocities;
     std::vector<double>  m_times;
     std::vector<double>  m_cumulative_impact_ionizations;
+    std::size_t          m_number_of_impact_ionizations = 0;
 
     ParticleHistory(std::size_t index, ParticleType type) : m_index(index), m_type(type) {}
 };
@@ -86,6 +87,8 @@ class Particle {
     double         get_probability_impact_ionization() const { return 1 - exp(-m_cumulative_impact_ionization); }
     double         charge_sign() const { return (m_type == ParticleType::electron) ? -1 : 1; }
 
+    const ParticleHistory& get_history() const { return m_history; }
+
     void compute_mobility(double temperature = 300.0) {
         if (m_type == ParticleType::electron) {
             m_mobility = physic::model::electron_mobility_arora_canali(m_doping, m_electric_field.norm(), temperature);
@@ -107,19 +110,24 @@ class Particle {
     }
 
     void perform_impact_ionization_step(double time_step) {
-        constexpr double cm_to_micron = 1e-4;
-        double m_local_ionization_coeff = 0.0;
+        constexpr double cm_to_micron             = 1e-4;
+        double           m_local_ionization_coeff = 0.0;
         if (m_type == ParticleType::electron) {
             m_local_ionization_coeff = mcintyre::alpha_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.12052);
         } else {
             m_local_ionization_coeff = mcintyre::beta_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.12052);
         }
-        m_cumulative_impact_ionization += time_step * m_drift_velocity.norm() * m_local_ionization_coeff * 1.0/cm_to_micron;
+        m_cumulative_impact_ionization += time_step * m_drift_velocity.norm() * m_local_ionization_coeff * 1.0 / cm_to_micron;
     }
 
     bool has_impact_ionized() const {
         const double integral_path_length = 1 - exp(-m_cumulative_impact_ionization);
         return integral_path_length >= m_rpl_number;
+    }
+
+    void add_impact_ionization_to_history() {
+        // std::cout << "Impact! " << std::endl;
+        m_history.m_number_of_impact_ionizations++;
     }
 
     void add_current_state_to_history() {

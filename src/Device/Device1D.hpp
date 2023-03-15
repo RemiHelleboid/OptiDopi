@@ -89,6 +89,10 @@ class Device1D {
     const doping_profile& get_doping_profile() const { return m_doping_profile; }
 
     void add_doping_profile(doping_profile& doping_profile);
+
+
+
+    void setup_constant_device(double x_length, std::size_t number_points, double doping_acceptor, double doping_donor);
     void setup_pin_diode(double      x_length,
                          std::size_t number_points,
                          double      length_donor,

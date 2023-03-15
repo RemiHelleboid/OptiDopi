@@ -81,6 +81,7 @@ class SimulationADMC {
     ADMCSimulationHistory m_history;
 
  public:
+    SimulationADMC(const ParametersADMC& parameters);
     SimulationADMC(const ParametersADMC& parameters, const Device1D& device, double voltage);
 
     const ADMCSimulationHistory& get_history() const { return m_history; }
@@ -123,6 +124,8 @@ class SimulationADMC {
      */
     void AddHoles(std::size_t number_of_holes, const Vector3& position);
 
+    void SetBulkData(double doping_level, double electric_field);
+
     void SetDataFromDeviceStep();
 
     void PerformDriftDiffusionStep();
@@ -134,10 +137,14 @@ class SimulationADMC {
     void FillSimulationHistory();
 
     void RunSimulation();
+    
+    void RunBULKSimulation(double doping_level, double electric_field);
 
-    bool has_reached_avalanche_threshold() const { return m_particles.size() > m_parameters.m_avalanche_threshold; }
+    bool has_reached_avalanche_threshold() const {
+        return m_particles.size() > m_parameters.m_avalanche_threshold; }
 
-    std::size_t get_number_of_particles() const { return m_particles.size(); }
+    std::size_t get_number_of_particles() const {
+        return m_particles.size(); }
     std::size_t get_number_of_electrons() const {
         return std::count_if(m_particles.begin(), m_particles.end(), [](const Particle& particle) {
             return particle.type() == ParticleType::electron;
@@ -157,6 +164,8 @@ class SimulationADMC {
         }
         return positions;
     }
+
+    std::vector<double> compute_impact_ionization_coeff() const;
 
     void ExportCurrentState() const;
     void ExportSimulationHistory() const;

@@ -29,6 +29,14 @@
 
 namespace ADMC {
 
+SimulationADMC::SimulationADMC(const ParametersADMC& parameters) : m_parameters(parameters), m_device{} {
+    std::random_device rd;
+    m_generator.seed(rd());
+    m_distribution_uniform = std::uniform_real_distribution<double>(0.0, 1.0);
+    m_distribution_normal  = std::normal_distribution<double>(0.0, 1.0);
+}
+
+
 SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D& myDevice, double voltage)
     : m_parameters(parameters),
       m_device(myDevice),
@@ -113,6 +121,16 @@ void SimulationADMC::AddHoles(std::size_t number_of_holes, const Vector3& positi
 //     }
 // }
 
+void SimulationADMC::SetBulkData(double doping_level, double electric_field) {
+    // Set doping and electric field
+    for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
+        m_particles[idx_part].set_doping(doping_level);
+        m_particles[idx_part].set_electric_field({electric_field, 0.0, 0.0});
+        m_particles[idx_part].compute_mobility();
+        m_particles[idx_part].compute_velocity();
+    }
+}
+
 void SimulationADMC::SetDataFromDeviceStep() {
     // Set doping and electric field
     std::vector<double> x_positions               = this->get_all_x_positions();
@@ -145,6 +163,7 @@ void SimulationADMC::PerformImpactIonizationStep() {
             double      new_r_parent_particle = m_distribution_uniform(m_generator);
             m_particles[idx_part].set_rpl_number(new_r_parent_particle);
             m_particles[idx_part].set_cumulative_impact_ionization(0.0);
+            m_particles[idx_part].add_impact_ionization_to_history();
             if (m_parameters.m_activate_particle_creation) {
                 Particle new_particle = Particle(index_new_particles, ParticleType::electron, m_particles[idx_part].position());
                 double   new_rpl      = m_distribution_uniform(m_generator);
@@ -191,6 +210,43 @@ void SimulationADMC::RunSimulation() {
         // std::cout << "Maximum time reached, simulation stopped" << std::endl;
     }
 }
+
+void SimulationADMC::RunBULKSimulation(double doping_level, double electric_field) {
+    m_time = 0.0;
+    ExportCurrentState();
+    while (m_time < m_parameters.m_max_time && m_particles.size() > 0 && m_particles.size() < m_parameters.m_max_particles) {
+        SetBulkData(doping_level, electric_field);
+        PerformDriftDiffusionStep();
+        PerformImpactIonizationStep();
+        m_time += m_parameters.m_time_step;
+        m_number_steps++;
+    }
+    if (m_particles.size() == 0) {
+        std::cout << "No more particles, simulation stopped" << std::endl;
+    } else if (m_particles.size() >= m_parameters.m_max_particles || m_particles.size() >= m_parameters.m_avalanche_threshold) {
+        m_history.m_has_reached_avalanche = true;
+        m_history.m_avalanche_time        = m_time;
+        // std::cout << "Avalanche!" << std::endl;
+    } else {
+        // std::cout << "Maximum time reached, simulation stopped" << std::endl;
+    }
+}
+
+std::vector<double> SimulationADMC::compute_impact_ionization_coeff() const {
+    std::vector<double> x_positions = get_all_x_positions();
+    std::vector<std::size_t> nb_impact_ionization_per_particle(x_positions.size(), 0);
+    for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
+        std::size_t nb_ii = m_particles[idx_part].get_history().m_number_of_impact_ionizations; 
+        nb_impact_ionization_per_particle[idx_part] = nb_ii;
+    }
+    std::vector<double> impact_ionization_rates(x_positions.size(), 0.0);
+    for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
+        double coeff = nb_impact_ionization_per_particle[idx_part] / fabs(x_positions[idx_part]);
+        impact_ionization_rates[idx_part] = coeff;
+    }
+    return impact_ionization_rates;
+}
+
 
 void SimulationADMC::ExportCurrentState() const {
     std::string   filename = fmt::format("{}State.csv.{:05d}", m_parameters.m_output_file, m_number_steps);
