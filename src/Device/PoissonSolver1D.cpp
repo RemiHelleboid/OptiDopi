@@ -5,6 +5,9 @@
 #include "PoissonSolver1D.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -300,7 +303,7 @@ void NewtonPoissonSolver::newton_solver(const double      final_anode_voltage,
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
             if (m_solver.info() != Eigen::Success) {
-                std::cerr << "Factorization failed. Poisson failed." << std::endl;
+                // fmt::print(std::cerr, "Factorization failed. Poisson failed.\n");
                 m_solver_success = false;
                 return;
             }
@@ -311,7 +314,7 @@ void NewtonPoissonSolver::newton_solver(const double      final_anode_voltage,
             m_solution(m_x_line.size() - 1) = compute_boundary_conditions(cathode_voltage, doping_cathode);
         }
         if (index_iteration == max_iterations) {
-            std::cerr << "Maximum number of iterations reached. Poisson failed." << std::endl;
+            // fmt::print(std::cerr, "Maximum number of iterations reached. Poisson failed.\n");
             m_solver_success = false;
             return;
             // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");
@@ -384,7 +387,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double      final_an
     std::vector<double> x_line_micron = m_xline_vector;
     std::for_each(x_line_micron.begin(), x_line_micron.end(), [m_to_micron](double& value) { value *= m_to_micron; });
     m_mcintyre_solver.set_xline(x_line_micron);
-    double       tol               = 1e-6;
+    double       tol               = 1e-8;
     double       breakdown_voltage = 0.0;
     // const double EF_Threshold      = 3.0e5;
 
@@ -407,7 +410,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double      final_an
             compute_right_hand_side();
             m_solver.factorize(m_matrix);
             if (m_solver.info() != Eigen::Success) {
-                std::cerr << "Factorization failed. Poisson failed." << std::endl;
+                fmt::print(std::cerr, "Factorization failed. Poisson failed.\n");
                 m_solver_success = false;
                 return;
             }
@@ -418,7 +421,7 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double      final_an
             m_solution(m_x_line.size() - 1) = compute_boundary_conditions(cathode_voltage, doping_cathode);
         }
         if (index_iteration == max_iterations) {
-            std::cerr << "Maximum number of iterations reached. Poisson failed." << std::endl;
+            fmt::print(std::cerr, "Maximum number of iterations reached. Poisson failed.\n");
             m_solver_success = false;
             return;
             // throw std::runtime_error("Maximum number of iterations reached. Increase the number of iterations");

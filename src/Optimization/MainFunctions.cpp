@@ -81,7 +81,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     std::filesystem::create_directories(dirname);
     std::cout << "Exporting best path to " << dirname << std::endl;
     double      intrinsic_level     = 1.0e13;
-    double      x_length            = 10.0;
+    double      x_length            = 8.0;
     std::size_t nb_points           = NBPOINTS;
     double      intrinsic_length    = 0.0;
     double      voltage_step_export = 0.5;
@@ -106,7 +106,13 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
 
     const std::string poisson_dir = fmt::format("{}/poisson_res/", dirname);
 
-    std::vector<std::size_t> iter_to_save_for_jitter = {0, 10, 50, 100, 500};
+    // std::vector<std::size_t> iter_to_save_for_jitter = {0, 25, 50, 75, 100, 200, 300, 400, 500};
+    std::vector<std::size_t> iter_to_save_for_jitter;
+    int StepJitter = 10;
+    for (int idx_Jitter=0; idx_Jitter < best_path.size(); idx_Jitter+=StepJitter) {
+        iter_to_save_for_jitter.push_back(idx_Jitter);
+    }
+
     std::vector<std::unique_ptr<Device1D>> saved_devices(iter_to_save_for_jitter.size());
     std::vector<double>                    saved_BV(iter_to_save_for_jitter.size());
 
@@ -179,7 +185,7 @@ void export_best_path(std::vector<std::vector<double>> best_path, std::string di
     //     double            BV           = saved_BV[i];
     //     double            BiasAboveBV  = 3.0;
     //     double            voltage_AMDC = BV + BiasAboveBV;
-    //     const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, i);
+    //     const std::string prefix_ADMC  = fmt::format("{}/ADMC_Iter_{:03d}_", dirname, iter_to_save_for_jitter[i]);
     //     saved_devices[i]->DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, prefix_ADMC);
     // }
 }
@@ -188,7 +194,7 @@ double intermediate_cost_function(double              donor_length,
                                   double              log_donor_level,
                                   std::vector<double> log_acceptor_levels,
                                   std::vector<double> parameters) {
-    double              x_length         = 10.0;
+    double              x_length         = 8.0;
     std::size_t         nb_points        = NBPOINTS;
     double              intrinsic_length = 0.0;
     double              donor_level      = pow(10, log_donor_level);
@@ -275,8 +281,8 @@ void MainParticleSwarmSPAD(std::size_t nb_particles, std::size_t max_iter, doubl
     std::size_t nb_parameters = N_X + 2;
     // Boundaries setup
     // Boundaries setup
-    double              min_length_donor = 0.99;
-    double              max_length_donor = 1.0;
+    double              min_length_donor = 0.1;
+    double              max_length_donor = 4.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
@@ -333,8 +339,8 @@ void MainSimulatedAnnealingSPAD(std::size_t nb_doe, std::size_t max_iter) {
     sa_options.m_beta_cooling        = 0.0;
     sa_options.m_log_frequency       = 10;
     // Boundaries setup
-    double              min_length_donor = 0.99;
-    double              max_length_donor = 1.0;
+    double              min_length_donor = 0.1;
+    double              max_length_donor = 4.0;
     double              min_doping       = 14.0;
     double              max_doping       = 19.0;
     double              donor_min_doping = DonorMIN;
@@ -351,7 +357,7 @@ void MainSimulatedAnnealingSPAD(std::size_t nb_doe, std::size_t max_iter) {
 
     std::vector<SimulatedAnnealHistory> histories(nb_doe);
 
-#pragma omp parallel for 
+#pragma omp parallel for
     for (std::size_t idx_doe = 0; idx_doe < nb_doe; idx_doe++) {
         std::string directory        = fmt::format("{}/thread_{}/", DIR_RES, idx_doe);
         SimulatedAnnealOptions spec_sa_options(sa_options);
