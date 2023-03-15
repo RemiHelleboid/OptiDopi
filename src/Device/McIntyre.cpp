@@ -6,6 +6,11 @@
 
 #include "McIntyre.hpp"
 
+#include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/color.h>
+
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <random>
@@ -51,8 +56,8 @@ void McIntyre::set_electric_field(std::vector<double> electric_field, bool recom
     if (electric_field.size() != m_xline.size()) {
         throw std::invalid_argument("The size of the electric field vector is not the same as the size of the xline vector.");
     }
-    // m_electric_field = electric_field;
-    m_electric_field = Utils::convol_square(electric_field, 3);
+    m_electric_field = electric_field;
+    // m_electric_field = Utils::convol_square(electric_field, 3);
     std::transform(m_electric_field.begin(), m_electric_field.end(), m_electric_field.begin(), [conv_factor](double x) {
         return x * conv_factor;
     });
@@ -253,7 +258,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     }
     if (Norm_w > tolerance && epoch == MaxEpoch) {
         mSolverHasConverged = false;
-        std::cerr << "FINAL NO CONVERGENCE OF MCINTYRE, NB EPOCH = " << epoch << std::endl;
+        // fmt::print(std::cerr, "FINAL NO CONVERGENCE OF MCINTYRE, NB EPOCH = {}.\n", epoch);
         mBreakdownP                                   = Eigen::VectorXd::Zero(2 * N);
         m_eBreakdownProbability                       = std::vector<double>(N, 0.0);
         m_hBreakdownProbability                       = std::vector<double>(N, 0.0);

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <memory>
 #include <random>
+#include <omp.h>
 
 #include "AdvectionDiffusionMC.hpp"
 #include "Device1D.hpp"
@@ -64,7 +65,7 @@ cost_function_result main_function_simple_spad(double donor_length, double donor
     my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
     bool poisson_success = my_device.get_poisson_success();
     if (!poisson_success) {
-        fmt::print(std::cerr, "Poisson failed\n");
+        // fmt::print(std::cerr, "Poisson failed\n");
     }
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, 1.0);
 
@@ -76,7 +77,7 @@ cost_function_result main_function_spad_complex(double                     donor
                                                 double                     total_length,
                                                 const std::vector<double>& x_acceptor,
                                                 const std::vector<double>& doping_acceptor) {
-    std::size_t number_points    = 400;
+    std::size_t number_points    = 1000;
     double      intrinsic_length = 0.0;
     double      intrinsic_level  = 1.0e13;
     int         DopSmooth        = 11;
@@ -103,7 +104,7 @@ cost_function_result main_function_spad_complex(double                     donor
     my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
     bool poisson_success = my_device.get_poisson_success();
     if (!poisson_success) {
-        fmt::print(std::cerr, "Poisson failed\n");
+        // fmt::print(std::cerr, "Poisson failed\n");
     }
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, 1.0);
 
@@ -199,10 +200,10 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     double      intrinsic_level  = 1e12;
     int         DopSmooth        = 11;
 
-    double min_total_length       = 6.0;
-    double max_total_length       = 6.0;
-    double min_donor_length       = 0.99;
-    double max_donor_length       = 1.0;
+    double min_total_length       = 8.0;
+    double max_total_length       = 8.0;
+    double min_donor_length       = 0.1;
+    double max_donor_length       = 4.0;
     double log_min_donor_level    = std::log10(1.0e16);
     double log_max_donor_level    = std::log10(1.0e20);
     double log_min_acceptor_level = std::log10(1.0e15);
@@ -311,16 +312,27 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
 }
 
 int main(int argc, char** argv) {
+
+    int nb_threads = 1;
+
+#pragma omp parallel
+{
+    nb_threads = omp_get_num_threads();
+}
+    std::cout << "Number threads: " << nb_threads << std::endl;
+
     auto start = std::chrono::high_resolution_clock::now();
 
     int number_samples = 200;
     if (argc > 1) {
         number_samples = std::stoi(argv[1]);
     }
+    std::cout << "Nb samples: " << number_samples << std::endl;
     fmt::print("Number of samples : {}\n", number_samples);
 
 
     // generate_dataset_simple_spad(number_samples);
+    std::cout << "Create dataset of complex 1D SPADs..." << std::endl;
     create_dataset_complex_spad(number_samples);
 
 
