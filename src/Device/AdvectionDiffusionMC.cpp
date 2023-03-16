@@ -24,6 +24,7 @@
 
 #include "Device1D.hpp"
 #include "Mobility.hpp"
+#include "Statistics.hpp"
 #include "fill_vector.hpp"
 #include "interpolation.hpp"
 
@@ -35,7 +36,6 @@ SimulationADMC::SimulationADMC(const ParametersADMC& parameters) : m_parameters(
     m_distribution_uniform = std::uniform_real_distribution<double>(0.0, 1.0);
     m_distribution_normal  = std::normal_distribution<double>(0.0, 1.0);
 }
-
 
 SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D& myDevice, double voltage)
     : m_parameters(parameters),
@@ -191,7 +191,6 @@ void SimulationADMC::CheckContactCrossing() {
 
 void SimulationADMC::RunSimulation() {
     m_time = 0.0;
-    ExportCurrentState();
     while (m_time < m_parameters.m_max_time && m_particles.size() > 0 && m_particles.size() < m_parameters.m_max_particles) {
         SetDataFromDeviceStep();
         PerformDriftDiffusionStep();
@@ -211,15 +210,48 @@ void SimulationADMC::RunSimulation() {
     }
 }
 
+std::vector<double> SimulationADMC::RunTransportSimulationToMaxField() {
+    auto                it_max_field = std::max_element(m_ElectricField.begin(), m_ElectricField.end());
+    double              x_max_field  = m_x_line[std::distance(m_ElectricField.begin(), it_max_field)];
+    std::vector<double> times_to_max_field;
+    const double tol_x = 5.0e-3;
+    while (m_time < m_parameters.m_max_time && m_particles.size() > 0) {
+        SetDataFromDeviceStep();
+        PerformDriftDiffusionStep();
+        m_time += m_parameters.m_time_step;
+        m_number_steps++;
+        std::vector<double>      x_positions = get_all_x_positions();
+        std::vector<std::size_t> idx_part_to_remove;
+        for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
+            if (fabs(x_positions[idx_part] - x_max_field) < tol_x) {
+                times_to_max_field.push_back(m_time);
+                idx_part_to_remove.push_back(idx_part);
+            }
+        }
+        std::erase_if(m_particles, [&](const Particle& p) {
+            return std::find(idx_part_to_remove.begin(), idx_part_to_remove.end(), p.index()) != idx_part_to_remove.end();
+        });
+    }
+    return times_to_max_field;
+}
+
 void SimulationADMC::RunBULKSimulation(double doping_level, double electric_field) {
     m_time = 0.0;
     ExportCurrentState();
+    std::vector<double> list_std_x;
+    std::vector<double> times;
+    list_std_x.push_back(0.0);
+    times.push_back(0.0);
     while (m_time < m_parameters.m_max_time && m_particles.size() > 0 && m_particles.size() < m_parameters.m_max_particles) {
         SetBulkData(doping_level, electric_field);
         PerformDriftDiffusionStep();
         PerformImpactIonizationStep();
         m_time += m_parameters.m_time_step;
         m_number_steps++;
+
+        double std_x = utils::standard_deviation(get_all_x_positions());
+        list_std_x.push_back(std_x);
+        times.push_back(m_time);
     }
     if (m_particles.size() == 0) {
         std::cout << "No more particles, simulation stopped" << std::endl;
@@ -230,23 +262,28 @@ void SimulationADMC::RunBULKSimulation(double doping_level, double electric_fiel
     } else {
         // std::cout << "Maximum time reached, simulation stopped" << std::endl;
     }
+    std::ofstream my_file("std_xVStime.csv");
+    my_file << "time,std_x" << std::endl;
+    for (std::size_t i = 0; i < list_std_x.size(); ++i) {
+        my_file << times[i] << "," << list_std_x[i] << std::endl;
+    }
+    my_file.close();
 }
 
 std::vector<double> SimulationADMC::compute_impact_ionization_coeff() const {
-    std::vector<double> x_positions = get_all_x_positions();
+    std::vector<double>      x_positions = get_all_x_positions();
     std::vector<std::size_t> nb_impact_ionization_per_particle(x_positions.size(), 0);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
-        std::size_t nb_ii = m_particles[idx_part].get_history().m_number_of_impact_ionizations; 
+        std::size_t nb_ii                           = m_particles[idx_part].get_history().m_number_of_impact_ionizations;
         nb_impact_ionization_per_particle[idx_part] = nb_ii;
     }
     std::vector<double> impact_ionization_rates(x_positions.size(), 0.0);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
-        double coeff = nb_impact_ionization_per_particle[idx_part] / fabs(x_positions[idx_part]);
+        double coeff                      = nb_impact_ionization_per_particle[idx_part] / fabs(x_positions[idx_part]);
         impact_ionization_rates[idx_part] = coeff;
     }
     return impact_ionization_rates;
 }
-
 
 void SimulationADMC::ExportCurrentState() const {
     std::string   filename = fmt::format("{}State.csv.{:05d}", m_parameters.m_output_file, m_number_steps);
@@ -329,6 +366,44 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         file_breakdown_ratio << x_line[idx_x] << "," << eBreakdownRatio[idx_x] << std::endl;
     }
     file_breakdown_ratio.close();
+}
+
+/**
+ * @brief Run simulations on every x position of the device and gather the results.
+ * Electron only simulation.
+ *
+ * @param parameters
+ * @param device
+ * @param nb_simulation_per_points
+ */
+void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
+                                      const Device1D&       device,
+                                      double                voltage,
+                                      std::size_t           nb_simulation_per_points,
+                                      std::size_t           nbPointsX,
+                                      const std::string&    export_name) {
+    double              x_max  = device.get_doping_profile().get_x_line().back();
+    std::vector<double> x_line = utils::linspace(0.0, x_max, nbPointsX);
+    std::vector<double> all_transport_times;
+
+#pragma omp parallel for schedule(dynamic)
+    for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
+        // std::cout << "Running simulation on point " << x_line[idx_x] << std::endl;
+        SimulationADMC      simulation(parameters, device, voltage);
+        simulation.AddElectrons(nb_simulation_per_points, {x_line[idx_x], 0.5, 0.5});
+        std::vector<double> time_to_max_field = simulation.RunTransportSimulationToMaxField();
+        // Add the avalanche times to the global vector
+#pragma omp critical
+        { all_transport_times.insert(all_transport_times.end(), time_to_max_field.begin(), time_to_max_field.end()); }
+    }
+
+    // Export the avalanche times to a file
+    std::ofstream file_avalanche_times(export_name + "TimeToMaxField.csv");
+    file_avalanche_times << "TimeToMaxField" << std::endl;
+    for (const auto& time : all_transport_times) {
+        file_avalanche_times << time << std::endl;
+    }
+    file_avalanche_times.close();
 }
 
 // void ExportAllParticlesHistory() const;

@@ -137,14 +137,14 @@ class SimulationADMC {
     void FillSimulationHistory();
 
     void RunSimulation();
-    
+
+    std::vector<double> RunTransportSimulationToMaxField();
+
     void RunBULKSimulation(double doping_level, double electric_field);
 
-    bool has_reached_avalanche_threshold() const {
-        return m_particles.size() > m_parameters.m_avalanche_threshold; }
+    bool has_reached_avalanche_threshold() const { return m_particles.size() > m_parameters.m_avalanche_threshold; }
 
-    std::size_t get_number_of_particles() const {
-        return m_particles.size(); }
+    std::size_t get_number_of_particles() const { return m_particles.size(); }
     std::size_t get_number_of_electrons() const {
         return std::count_if(m_particles.begin(), m_particles.end(), [](const Particle& particle) {
             return particle.type() == ParticleType::electron;
@@ -178,5 +178,12 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
                             std::size_t           nb_simulation_per_points,
                             std::size_t           nbPointsX,
                             const std::string&    export_name);
+
+void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
+                                      const Device1D&       device,
+                                      double                voltage,
+                                      std::size_t           nb_simulation_per_points,
+                                      std::size_t           nbPointsX,
+                                      const std::string&    export_name);
 
 }  // namespace ADMC

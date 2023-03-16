@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     parameters_admc.m_temperature = temperature;
     parameters_admc.m_activate_impact_ionization = true;
     parameters_admc.m_activate_particle_creation = true;
-    parameters_admc.m_max_particles = 1000;
+    parameters_admc.m_max_particles = 100;
     parameters_admc.m_avalanche_threshold = parameters_admc.m_max_particles;
     parameters_admc.m_output_file = "ADMC_0/ADMC_0_";
     std::filesystem::create_directory("ADMC_0");

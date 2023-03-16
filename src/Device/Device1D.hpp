@@ -90,8 +90,6 @@ class Device1D {
 
     void add_doping_profile(doping_profile& doping_profile);
 
-
-
     void setup_constant_device(double x_length, std::size_t number_points, double doping_acceptor, double doping_donor);
     void setup_pin_diode(double      x_length,
                          std::size_t number_points,
@@ -153,4 +151,10 @@ class Device1D {
                               std::size_t                 nb_simulation_per_points,
                               std::size_t                 nbXPoints,
                               const std::string&          export_name);
+
+    void DeviceADMCSimulationToMaxField(const ADMC::ParametersADMC& parameters,
+                                        double                      voltage,
+                                        std::size_t                 nb_simulation_per_points,
+                                        std::size_t                 nbXPoints,
+                                        const std::string&          export_name);
 };

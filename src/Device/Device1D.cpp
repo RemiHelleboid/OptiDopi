@@ -20,12 +20,7 @@
 
 void Device1D::add_doping_profile(doping_profile& doping_profile) { m_doping_profile = doping_profile; }
 
-
-void Device1D::setup_constant_device(double x_length, std::size_t number_points, double doping_acceptor, double doping_donor){
-
-}
-
-
+void Device1D::setup_constant_device(double x_length, std::size_t number_points, double doping_acceptor, double doping_donor) {}
 
 void Device1D::setup_pin_diode(double      xlenght,
                                std::size_t number_points,
@@ -281,10 +276,16 @@ double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
 cost_function_result Device1D::compute_cost_function(double voltage_above_breakdown, double time) const {
     const double alpha_BV  = 20.0;
-    const double alpha_BP  = 5.0;
-    const double alpha_DW  = 200.0;
     double       BV_TOL    = 2.0;
     double       BV_Target = 20.0;
+
+    double alpha_BP = 5.0;
+    double alpha_DW = 200.0;
+
+    if (time > 0.8) {
+        alpha_BP = 200.0;
+        alpha_DW = 5.0;
+    }
 
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
@@ -320,5 +321,13 @@ void Device1D::DeviceADMCSimulation(const ADMC::ParametersADMC& parameters,
                                     std::size_t                 nb_simulation_per_points,
                                     std::size_t                 nbXPoints,
                                     const std::string&          export_name) {
+    ADMC::MainFullADMCSimulation(parameters, *this, voltage, nb_simulation_per_points, nbXPoints, export_name);
+}
+
+void Device1D::DeviceADMCSimulationToMaxField(const ADMC::ParametersADMC& parameters,
+                                              double                      voltage,
+                                              std::size_t                 nb_simulation_per_points,
+                                              std::size_t                 nbXPoints,
+                                              const std::string&          export_name) {
     ADMC::MainFullADMCSimulation(parameters, *this, voltage, nb_simulation_per_points, nbXPoints, export_name);
 }
