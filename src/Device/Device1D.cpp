@@ -282,10 +282,10 @@ cost_function_result Device1D::compute_cost_function(double voltage_above_breakd
     double alpha_BP = 5.0;
     double alpha_DW = 200.0;
 
-    if (time > 0.8) {
-        alpha_BP = 200.0;
-        alpha_DW = 5.0;
-    }
+    // if (time > 0.8) {
+    //     alpha_BP = 200.0;
+    //     alpha_DW = 5.0;
+    // }
 
     double BreakdownVoltage     = extract_breakdown_voltage(1.0e-6);
     double BreakdownProbability = get_brp_at_voltage(BreakdownVoltage + voltage_above_breakdown);
