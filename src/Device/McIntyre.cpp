@@ -234,9 +234,9 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
     Eigen::VectorXd                               B   = assembleSecondMemberNewton();
     Eigen::SparseLU<Eigen::SparseMatrix<double> > EigenSolver;
     EigenSolver.analyzePattern(MAT);
-    int    MaxEpoch = 2500;
+    int    MaxEpoch = 1000;
     double factor   = 1.0;
-    double lambda   = 1.0;
+    double lambda   = 0.99;
     while (Norm_w > tolerance && epoch < MaxEpoch) {
         MAT = assembleMat();
         B   = assembleSecondMemberNewton();
@@ -244,7 +244,7 @@ void McIntyre::ComputeDampedNewtonSolution(double tolerance) {
         if (EigenSolver.info() != Eigen::Success) {
             mSolverHasConverged = false;
             factor              = factor * 0.95;
-            initial_guess(factor * 0.8, factor * 0.4);
+            initial_guess(factor * 0.9, factor * 0.5);
             mBreakdownP = m_InitialGuessBreakdownP;
             epoch++;
         } else {

@@ -107,6 +107,7 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     m_donor_concentration.resize(number_points);
     m_acceptor_concentration.resize(number_points);
 
+    std::cout << "Length donor: " << length_donor << std::endl;
     for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
         double x_position = m_x_line[index_x];
         if (x_position <= length_donor) {
@@ -116,7 +117,7 @@ void doping_profile::set_up_advanced_pin(double              xlength,
             m_donor_concentration[index_x]    = intrinsic_level;
             m_acceptor_concentration[index_x] = intrinsic_level;
         } else {
-            break;
+            m_donor_concentration[index_x]    = intrinsic_level;
         }
     }
     std::size_t nb_acceptor = list_x_acceptor.size();
@@ -133,7 +134,6 @@ void doping_profile::set_up_advanced_pin(double              xlength,
             double x_position = m_x_line[index_x];
             if (x_position >= x_init && x_position <= x_end) {
                 m_acceptor_concentration[index_x] = exponential_link(x_position, alpha, beta);
-                m_donor_concentration[index_x]    = intrinsic_level;
             }
         }
     }

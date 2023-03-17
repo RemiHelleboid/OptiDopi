@@ -215,7 +215,7 @@ std::vector<double> SimulationADMC::RunTransportSimulationToMaxField() {
     auto                it_max_field = std::max_element(m_ElectricField.begin(), m_ElectricField.end());
     double              x_max_field  = m_x_line[std::distance(m_ElectricField.begin(), it_max_field)];
     std::vector<double> times_to_max_field;
-    const double tol_x = 5.0e-3;
+    const double tol_x = 2.0e-3;
     while (m_time < m_parameters.m_max_time && m_particles.size() > 0) {
         SetDataFromDeviceStep();
         PerformDriftDiffusionStep();

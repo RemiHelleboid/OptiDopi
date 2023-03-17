@@ -8,12 +8,12 @@
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <fmt/xchar.h>
+#include <omp.h>
 
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <random>
-#include <omp.h>
 
 #include "AdvectionDiffusionMC.hpp"
 #include "Device1D.hpp"
@@ -77,7 +77,7 @@ cost_function_result main_function_spad_complex(double                     donor
                                                 double                     total_length,
                                                 const std::vector<double>& x_acceptor,
                                                 const std::vector<double>& doping_acceptor) {
-    std::size_t number_points    = 1000;
+    std::size_t number_points    = 200;
     double      intrinsic_length = 0.0;
     double      intrinsic_level  = 1.0e13;
     int         DopSmooth        = 11;
@@ -206,15 +206,13 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     double max_donor_length       = 4.0;
     double log_min_donor_level    = std::log10(1.0e16);
     double log_max_donor_level    = std::log10(1.0e20);
-    double log_min_acceptor_level = std::log10(1.0e15);
-    double log_max_acceptor_level = std::log10(1.0e19);
-    int    NbAcceptors            = 8;
+    double log_min_acceptor_level = std::log10(1.0e16);
+    double log_max_acceptor_level = std::log10(1.0e20);
+    int    NbAcceptors            = 10;
 
     std::size_t NbPointSamplingDoping = 20;
 
     // Create a random number generator
-    std::random_device               rd;
-    std::mt19937                     gen(rd());
     std::uniform_real_distribution<> dis_total_length(min_total_length, max_total_length);
     std::uniform_real_distribution<> dis_donor_length(min_donor_length, max_donor_length);
     std::uniform_real_distribution<> dis_donor_level(log_min_donor_level, log_max_donor_level);
@@ -226,7 +224,6 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     std::vector<std::vector<double>> donor_levels(nb_samples, std::vector<double>(number_points));
     std::vector<std::vector<double>> acceptor_levels(nb_samples, std::vector<double>(number_points));
 
-
     std::vector<double> BreakdownVoltages(nb_samples);
     std::vector<double> BreakdownProbabilities(nb_samples);
     std::vector<double> DepletionWidths(nb_samples);
@@ -234,8 +231,11 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
 
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < nb_samples; ++i) {
-        double total_length = dis_total_length(gen);
-        double donor_length = dis_donor_length(gen);
+        std::random_device               rd;
+        std::mt19937                     gen(rd());
+        double                           total_length = dis_total_length(gen);
+        std::uniform_real_distribution<> dis_donor_length(min_donor_length, total_length / 2.0);
+        double                           donor_length = dis_donor_length(gen);
         if (donor_length > total_length) {
             continue;
         }
@@ -247,7 +247,7 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
         }
         Device1D my_device;
         my_device.set_up_complex_diode(total_length,
-                                       200,
+                                       number_points,
                                        donor_length,
                                        intrinsic_length,
                                        donor_level,
@@ -255,10 +255,11 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
                                        acceptor_x,
                                        acceptor_lev);
         // my_device.smooth_doping_profile(DopSmooth);
-        donor_levels[i]  = my_device.get_doping_profile().get_donor_concentration();
+        donor_levels[i]    = my_device.get_doping_profile().get_donor_concentration();
         acceptor_levels[i] = my_device.get_doping_profile().get_acceptor_concentration();
-        doping_levels[i] = my_device.get_doping_profile().get_doping_concentration();
-        total_lengths[i]                    = total_length;
+        doping_levels[i]   = my_device.get_doping_profile().get_doping_concentration();
+        total_lengths[i]   = total_length;
+        donor_lengths[i]   = donor_length;
         try {
             cost_function_result cost_result =
                 main_function_spad_complex(donor_length, donor_level, total_length, acceptor_x, acceptor_lev);
@@ -287,7 +288,7 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     fmt::print("Saving data to {}\n", filename);
 
     std::ofstream file(filename);
-    file << "TotalLength";
+    file << "TotalLength,DonorLength";
     for (std::size_t i = 0; i < number_points; ++i) {
         file << fmt::format(",Donor_{}", i);
     }
@@ -299,7 +300,7 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
         if (failed_samples[i] == 1) {
             continue;
         }
-        file << fmt::format("{:.3f}", total_lengths[i]);
+        file << fmt::format("{:.3f}", total_lengths[i]) << fmt::format(",{:.3f}", donor_lengths[i]);
         for (std::size_t j = 0; j < number_points; ++j) {
             file << fmt::format(",{:.3e}", donor_levels[i][j]);
         }
@@ -312,13 +313,10 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
 }
 
 int main(int argc, char** argv) {
-
     int nb_threads = 1;
 
 #pragma omp parallel
-{
-    nb_threads = omp_get_num_threads();
-}
+    { nb_threads = omp_get_num_threads(); }
     std::cout << "Number threads: " << nb_threads << std::endl;
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -330,12 +328,9 @@ int main(int argc, char** argv) {
     std::cout << "Nb samples: " << number_samples << std::endl;
     fmt::print("Number of samples : {}\n", number_samples);
 
-
     // generate_dataset_simple_spad(number_samples);
     std::cout << "Create dataset of complex 1D SPADs..." << std::endl;
     create_dataset_complex_spad(number_samples);
-
-
 
     auto                          end             = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;

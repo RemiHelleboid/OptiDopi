@@ -50,7 +50,7 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_don
     Device1D my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
     my_device.smooth_doping_profile(5);
-    double       target_anode_voltage  = 30.0;
+    double       target_anode_voltage  = 30000.0;
     double       tol                   = 1.0e-8;
     const int    max_iter              = 1000;
     double       mcintyre_voltage_step = 0.25;
@@ -64,7 +64,7 @@ double intermediate_cost_function(double length_intrinsic, double log_doping_don
         return BIG_DOUBLE;
     }
 
-    double               time_       = 0.5;
+    double               time_       = 0.0;
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, time_);
     double               cost        = cost_result.total_cost;
     // fmt::print("BV: {:.2f}, BRP: {:.2f}, DW: {:.2e}, Cost: {:.2f}\n", BV, BRP, DW, cost);
@@ -86,14 +86,12 @@ int main(int argc, char** argv) {
         std::cout << "Error in arguments\n";
         std::cout << "Usage is > spad_cost_function length_intrinsic log_donor_level log_acceptor_level file_result.csv";
     }
-    double arg_lenght_intrinsic = atof(argv[1]);
+    double arg_length_intrinsic = atof(argv[1]);
     double log_donor_level      = atof(argv[2]);
     double log_doping_acceptor  = atof(argv[3]);
 
-    std::cout << "Running cost function ...\n";
-
     const std::string& file_res = std::string(argv[4]);
-    double         results  = intermediate_cost_function(arg_lenght_intrinsic, log_donor_level, log_doping_acceptor);
+    double         results  = intermediate_cost_function(arg_length_intrinsic, log_donor_level, log_doping_acceptor);
 
     // double               length_intrinsic = results.length_intrinsic;
     // double               doping_acceptor  = results.doping_acceptor;
@@ -110,10 +108,9 @@ int main(int argc, char** argv) {
     std::ofstream file_result(file_res);
     fmt::print(file_result,
                "{:.6e},{:.6e},{:.6e},{:.6e}\n",
-               arg_lenght_intrinsic,
+               arg_length_intrinsic,
                log_donor_level,
                log_doping_acceptor,
                total_cost);
     file_result.close();
-    std::cout << "Goodbye :) \n";
 }
