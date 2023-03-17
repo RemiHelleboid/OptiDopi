@@ -4,27 +4,27 @@
 
 #include <fmt/core.h>
 
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 #include <memory>
 #include <random>
 
+#include "AdvectionDiffusionMC.hpp"
+#include "Device1D.hpp"
 #include "McIntyre.hpp"
 #include "PoissonSolver1D.hpp"
-#include "Device1D.hpp"
-
-#include "AdvectionDiffusionMC.hpp"
 
 int main(int argc, char** argv) {
-    auto start = std::chrono::high_resolution_clock::now();
+    std::cout << "Hello, world!" << std::endl;
+    auto        start            = std::chrono::high_resolution_clock::now();
     std::size_t number_points    = 400;
     double      total_length     = 5.0;
-    double      length_donor     = 0.25;
+    double      length_donor     = 0.5;
     double      doping_donor     = 5.0e19;
     double      doping_intrinsic = 1.0e13;
     double      length_intrinsic = 0.0;
 
-    double doping_acceptor = 2.0e16;
+    double doping_acceptor = 5.0e16;
 
     Device1D my_device;
     my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
@@ -52,37 +52,45 @@ int main(int argc, char** argv) {
     fmt::print("BV: {}, BRP: {}, DW: {}, cost: {}\n", BV, BRP, DW, cost);
 
     fmt::print("Start Advection Diffusion Monte Carlo\n");
-    double       temperature = 300.0;
-    double       time_step   = 5.0e-14;
-    double       final_time  = 5.0e-9;
+    double temperature = 300.0;
+    double time_step   = 1.0e-14;
+    double final_time  = 5.0e-9;
 
     ADMC::ParametersADMC parameters_admc;
-    parameters_admc.m_time_step = time_step;
-    parameters_admc.m_max_time  = final_time;
-    parameters_admc.m_temperature = temperature;
+    parameters_admc.m_time_step                  = time_step;
+    parameters_admc.m_max_time                   = final_time;
+    parameters_admc.m_temperature                = temperature;
     parameters_admc.m_activate_impact_ionization = true;
     parameters_admc.m_activate_particle_creation = true;
-    parameters_admc.m_max_particles = 100;
-    parameters_admc.m_avalanche_threshold = parameters_admc.m_max_particles;
-    parameters_admc.m_output_file = "ADMC_0/ADMC_0_";
+    parameters_admc.m_max_particles              = 100;
+    parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
+    parameters_admc.m_output_file                = "ADMC_0/ADMC_0_";
     std::filesystem::create_directory("ADMC_0");
 
     double voltage_AMDC = BV + BiasAboveBV;
-    my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20); 
-
+    my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20);
 
     // ADMC::SimulationADMC simulation_admc(parameters_admc, my_device);
     // simulation_admc.set_electric_field(voltage_AMDC);
     // simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
     // simulation_admc.RunSimulation();
 
-    std::size_t nb_simulation_per_point = 20;
-    std::size_t NbPointsX = 100;
+    std::size_t nb_simulation_per_point = 200;
+    std::size_t NbPointsX               = 100;
+    std::cout << "Start ADMC simulation" << std::endl;
     // ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX);
-    my_device.DeviceADMCSimulation(parameters_admc, voltage_AMDC, nb_simulation_per_point, NbPointsX, fmt::format("SimpleSPAD_{:.2f}_",voltage_AMDC));
-    
+    // my_device.DeviceADMCSimulation(parameters_admc,
+    //                                voltage_AMDC,
+    //                                nb_simulation_per_point,
+    //                                NbPointsX,
+    //                                fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
+    my_device.DeviceADMCSimulationToMaxField(parameters_admc,
+                                             voltage_AMDC,
+                                             nb_simulation_per_point,
+                                             NbPointsX,
+                                             fmt::format("SimpleSPAD_MField_{:.2f}_", voltage_AMDC));
 
-    auto end = std::chrono::high_resolution_clock::now();
+    auto                          end             = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;
     fmt::print("Total time : {:.3f} s \n\n", elapsed_seconds.count());
 }

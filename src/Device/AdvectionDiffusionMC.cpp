@@ -21,6 +21,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #include "Device1D.hpp"
 #include "Mobility.hpp"
@@ -228,9 +229,12 @@ std::vector<double> SimulationADMC::RunTransportSimulationToMaxField() {
                 idx_part_to_remove.push_back(idx_part);
             }
         }
-        std::erase_if(m_particles, [&](const Particle& p) {
-            return std::find(idx_part_to_remove.begin(), idx_part_to_remove.end(), p.index()) != idx_part_to_remove.end();
-        });
+        std::size_t nb_particle = m_particles.size();
+        for (std::size_t idx_part = 0; idx_part < nb_particle; ++idx_part) {
+            if (std::find(idx_part_to_remove.begin(), idx_part_to_remove.end(), idx_part) != idx_part_to_remove.end()) {
+                m_particles.erase(m_particles.begin() + idx_part);
+            }
+        }
     }
     return times_to_max_field;
 }
@@ -382,6 +386,9 @@ void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
                                       std::size_t           nb_simulation_per_points,
                                       std::size_t           nbPointsX,
                                       const std::string&    export_name) {
+
+    std::filesystem::create_directory("TEST_FIELD");
+
     double              x_max  = device.get_doping_profile().get_x_line().back();
     std::vector<double> x_line = utils::linspace(0.0, x_max, nbPointsX);
     std::vector<double> all_transport_times;
@@ -395,9 +402,16 @@ void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
         // Add the avalanche times to the global vector
 #pragma omp critical
         { all_transport_times.insert(all_transport_times.end(), time_to_max_field.begin(), time_to_max_field.end()); }
+        std::ofstream file_transport_times("TEST_FIELD/TimeToMaxField_" + std::to_string(idx_x) + "_.csv");
+        file_transport_times << "TimeToMaxField" << std::endl;
+        for (const auto& time : time_to_max_field) {
+            file_transport_times << time << std::endl;
+        }
+        file_transport_times.close();
     }
 
     // Export the avalanche times to a file
+    std::cout << "Exporting the time to max field" << std::endl;
     std::ofstream file_avalanche_times(export_name + "TimeToMaxField.csv");
     file_avalanche_times << "TimeToMaxField" << std::endl;
     for (const auto& time : all_transport_times) {
