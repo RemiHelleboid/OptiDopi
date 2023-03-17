@@ -107,7 +107,6 @@ void doping_profile::set_up_advanced_pin(double              xlength,
     m_donor_concentration.resize(number_points);
     m_acceptor_concentration.resize(number_points);
 
-    std::cout << "Length donor: " << length_donor << std::endl;
     for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
         double x_position = m_x_line[index_x];
         if (x_position <= length_donor) {

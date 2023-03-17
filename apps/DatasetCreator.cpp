@@ -77,7 +77,7 @@ cost_function_result main_function_spad_complex(double                     donor
                                                 double                     total_length,
                                                 const std::vector<double>& x_acceptor,
                                                 const std::vector<double>& doping_acceptor) {
-    std::size_t number_points    = 200;
+    std::size_t number_points    = 500;
     double      intrinsic_length = 0.0;
     double      intrinsic_level  = 1.0e13;
     int         DopSmooth        = 11;
