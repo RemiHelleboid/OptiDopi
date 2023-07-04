@@ -37,3 +37,7 @@ target_link_libraries(SA_SPAD.x libdevice libutils liboptim)
 add_executable(DATAGEN.x DatasetCreator.cpp)
 target_link_libraries(DATAGEN.x fmt::fmt OpenMP::OpenMP_CXX)
 target_link_libraries(DATAGEN.x libdevice libutils liboptim)
+
+add_executable(McIntyreSolo.x McIntyreSolo.cpp)
+target_link_libraries(McIntyreSolo.x fmt::fmt OpenMP::OpenMP_CXX)
+target_link_libraries(McIntyreSolo.x libdevice libutils liboptim)

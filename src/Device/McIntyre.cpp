@@ -6,10 +6,10 @@
 
 #include "McIntyre.hpp"
 
+#include <fmt/color.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <fmt/color.h>
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -302,6 +302,19 @@ double McIntyre::get_mean_total_breakdown_probability() const {
         mean += p;
     }
     return mean / m_totalBreakdownProbability.size();
+}
+
+void McIntyreSolution::export_to_file(const std::string& filename, std::vector<double> x_line, std::vector<double> field) const {
+    std::cout << "Exporting McIntyre Result to: " << filename << std::endl;
+    std::ofstream file;
+    file.open(filename);
+    file << "X,Field,eBreakdownProbability,hBreakdownProbability,BreakdownProbability\n";
+    std::size_t N = x_line.size();
+    for (std::size_t idx = 0; idx < N; ++idx) {
+        file << x_line[idx] << "," << field[idx] << "," << e_breakdown_probability[idx] << ","
+             << h_breakdown_probability[idx] << "," << total_breakdown_probability[idx] << "\n";
+    }
+    file.close();
 }
 
 }  // namespace mcintyre

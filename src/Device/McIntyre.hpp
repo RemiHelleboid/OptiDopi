@@ -36,7 +36,7 @@ struct McIntyreSolution {
     std::vector<double> h_breakdown_probability;
     bool                solver_has_converged;
 
-    void export_to_file(const std::string& filename) const;
+    void export_to_file(const std::string& filename, std::vector<double> x_line, std::vector<double> field) const;
 };
 
 class McIntyre {
