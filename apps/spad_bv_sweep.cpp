@@ -7,25 +7,34 @@
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <fmt/xchar.h>
+#include <fmt/chrono.h>
+#include <omp.h>
 
-#include "PoissonSolver.hpp"
-#include "device.hpp"
-#include "doping_profile.hpp"
+#include <filesystem>
+#include <iostream>
+#include <memory>
+#include <random>
+
+#include "AdvectionDiffusionMC.hpp"
+#include "Device1D.hpp"
+#include "McIntyre.hpp"
+#include "PoissonSolver1D.hpp"
 #include "fill_vector.hpp"
+
 
 int main(int argc, char** argv) {
     fmt::print("Start of the program {}.\n", argv[0]);
-    double      total_length     = 10.0;
+    double      total_length     = 5.0;
     std::size_t number_points    = 350;
     double      length_donor     = 0.5;
     double      doping_donor     = atof(argv[1]);
     double      doping_intrinsic = 1.0e13;
 
-    double min_acceptor           = 5.0e16;
+    double min_acceptor           = 1.0e16;
     double max_acceptor           = 1.0e19;
-    int    number_acceptor_points = 150;
+    int    number_acceptor_points = 250;
+    int    nb_length_intrinsic    = 250;
     auto   list_doping_acceptor   = utils::geomspace(min_acceptor, max_acceptor, number_acceptor_points);
-    int    nb_length_intrinsic    = 150;
     auto   list_length_intrisic   = utils::linspace(0.0, 1.0, nb_length_intrinsic);
 
     std::vector<std::vector<double>> BV_list(number_acceptor_points);
@@ -40,7 +49,7 @@ int main(int argc, char** argv) {
         const double doping_acceptor = list_doping_acceptor[i];
         for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {
             const double length_intrinsic = list_length_intrisic[idx_length];
-            device       my_device;
+            Device1D       my_device;
             my_device.setup_pin_diode(total_length,
                                       number_points,
                                       length_donor,
@@ -66,21 +75,31 @@ int main(int argc, char** argv) {
             double BiasAboveBV               = 3.0;
             double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
             double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV);
-            fmt::print("({}/{}) \t Acceptor : {:3e} \t Intrinsic : {:3e} \t BV : {:3e} \t BrP : {:3e} \t Depletion : {:3e} \n",
-                       i * number_acceptor_points + idx_length,
-                       number_acceptor_points * nb_length_intrinsic,
-                       doping_acceptor,
-                       length_intrinsic,
-                       BV,
-                       BrP_at_Biasing,
-                       DepletionWidth_at_Biasing);
+            if (omp_get_thread_num() == 0) {
+                fmt::print("({}/{}) \t Acceptor : {:.2e} \t Intrinsic : {:.2e} \t BV : {:.2f} V \t BrP : {:.0f}% \t Depletion : {:.1f} \n",
+                           i * number_acceptor_points + idx_length,
+                           number_acceptor_points * nb_length_intrinsic,
+                           doping_acceptor,
+                           length_intrinsic,
+                           BV,
+                           BrP_at_Biasing * 100,
+                           DepletionWidth_at_Biasing * 1.0e6);
+            }
+
             BV_list[i][idx_length]                    = BV;
             Breakdown_Probability_list[i][idx_length] = BrP_at_Biasing;
             Depletion_Width_list[i][idx_length]       = DepletionWidth_at_Biasing;
         }
     }
     // Export BV list
-    std::ofstream BV_file("BV_list.csv");
+    // Get the current time
+    auto time = std::time(nullptr);
+    // Convert to local time
+    auto local_time = *std::localtime(&time);
+    std::string time_string = fmt::format("{:%Y-%m-%d_%H-%M-%S}", local_time);
+    std::string filename   = fmt::format("BV_list_{}.csv", time_string);
+    
+    std::ofstream BV_file(filename);
     BV_file << "Acceptor,L_intrinsic,BV,BrP,Depletion" << std::endl;
     for (int i = 0; i < number_acceptor_points; ++i) {
         for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {

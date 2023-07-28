@@ -1,0 +1,69 @@
+\documentclass[]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% r vector
+\newcommand{\rv}{\mathbf{r}}
+
+\title{Poisson}
+
+\begin{document}
+
+\maketitle
+
+\section{Poisson}
+
+\subsection{Main equations}
+
+The Poisson equation for semiconductors simulation is given by:
+\begin{equation}
+\label{eq:poisson}
+\nabla \cdot \left( \epsilon \nabla \phi \right) = q \left( N_D - N_A + N_C^+ - N_V^- \right)
+\end{equation}
+where $\epsilon$ is the dielectric constant, $\phi$ is the electrostatic potential, $q$ is the elementary charge, $N_D$ is the donor concentration, $N_A$ is the acceptor concentration, $N_C^+$ is the concentration of ionized donors and $N_V^-$ is the concentration of ionized acceptors.
+
+For now, we will focus on the case of a bulk and unique semiconductor material, so that $\epsilon$ is constant over the whole domain. 
+We shall note $\rho = q \left( N_D - N_A + N_C^+ - N_V^- \right)$ the charge density, so that we are left with:
+
+\begin{equation}
+\label{eq:poisson2}
+\Delta \phi(\rv) = \frac{\rho(\rv)}{\epsilon}
+\end{equation}
+
+We shall consider two types of boundary conditions:
+\begin{itemize}
+\item Dirichlet boundary conditions: $\phi(\rv) = \phi_D(\rv)$ on $\partial \Omega_D$
+\item Neumann boundary conditions: $\frac{\partial \phi}{\partial n} = \phi_N(\rv)$ on $\partial \Omega_N$
+\end{itemize}
+where $\partial \Omega_D$ and $\partial \Omega_N$ are the Dirichlet and Neumann boundaries respectively, and $n$ is the normal vector to the boundary.
+
+At the contacts, we consider that the potential is fixed, so that we have Dirichlet boundary conditions:
+\begin{equation}
+\label{eq:poisson3}
+\phi(\rv) = \phi_D(\rv) \quad \text{on} \quad \partial \Omega_D.
+\end{equation}
+
+At the interfaces with insulators (air, oxide), we consider that the component of the electric field normal to the interface is null, so that we have Neumann boundary conditions:
+\begin{equation}
+\label{eq:poisson4}
+\frac{\partial \phi}{\partial n} = 0 \quad \text{on} \quad \partial \Omega_N.
+\end{equation}
+
+\subsection{Charge density}
+We place ourselves in the case of a non-degenerate semiconductor, at equilibrium, so that the charge density for electrons and holes is given by:
+\begin{equation}
+\label{eq:charge_density}
+n = n_i \exp \left( \frac{\phi}{V_T} \right) \quad \text{and} \quad p = n_i \exp \left( - \frac{\phi}{V_T} \right)
+\end{equation}
+where $n_i$ is the intrinsic carrier concentration, $\phi$ is the electrostatic potential, and $V_T$ is the thermal voltage.
+
+In the presence of an applied voltage, the charge density is given by:
+\begin{equation}
+\label{eq:charge_density2}
+n = n_i \exp \left( \frac{\phi - V}{V_T} \right) \quad \text{and} \quad p = n_i \exp \left( \frac{V - \phi}{V_T} \right)
+\end{equation}
+where $V$ is the applied voltage.
+
+
+\end{document}
