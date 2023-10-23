@@ -61,7 +61,7 @@ void Device1D::solve_poisson(const double final_anode_voltage, const double tole
     m_list_poisson_solutions = m_poisson_solver.get_list_poisson_solutions();
 }
 
-PoissonSolution Device1D::get_poisson_solution_at_voltage(double voltage) const {
+const PoissonSolution& Device1D::get_poisson_solution_at_voltage(double voltage) const {
     auto it = std::lower_bound(m_list_voltages.begin(), m_list_voltages.end(), voltage);
     if (it == m_list_voltages.end()) {
         std::cout << "Voltage " << voltage << " not found in the list of voltages. Max voltage = " << m_list_voltages.back() << std::endl;
@@ -260,6 +260,7 @@ void Device1D::export_mcintyre_solution(const std::string& directory_name, const
     }
     std::cout << "Exporting the McIntyre solution to the directory " << directory_name << " done." << std::endl;
 }
+
 
 double Device1D::get_brp_at_voltage(double voltage) const {
     double interpolated_brp = Utils::interp1d(m_list_mcintyre_voltages, get_list_total_breakdown_probability(), voltage);

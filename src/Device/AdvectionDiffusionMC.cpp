@@ -16,17 +16,19 @@
 #include <fmt/ostream.h>
 
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <random>
 #include <string>
 #include <vector>
-#include <filesystem>
 
 #include "Device1D.hpp"
 #include "Mobility.hpp"
 #include "Statistics.hpp"
+#include "export_vector.hpp"
 #include "fill_vector.hpp"
+#include "gradient.hpp"
 #include "interpolation.hpp"
 
 namespace ADMC {
@@ -45,7 +47,11 @@ SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D&
       m_doping(myDevice.get_doping_profile().get_doping_concentration()),
       m_ElectricField(m_device.get_poisson_solution_at_voltage(voltage).m_electric_field),
       m_eVelocity(m_x_line.size()),
-      m_hVelocity(m_x_line.size()) {
+      m_hVelocity(m_x_line.size()),
+      m_eDiffusion(m_x_line.size()),
+      m_hDiffusion(m_x_line.size()),
+      m_eDivDiffusion(m_x_line.size()),
+      m_hDivDiffusion(m_x_line.size()) {
     m_particles.reserve(m_parameters.m_max_particles);
 
     if (m_ElectricField.size() != m_x_line.size()) {
@@ -56,6 +62,30 @@ SimulationADMC::SimulationADMC(const ParametersADMC& parameters, const Device1D&
     m_generator.seed(rd());
     m_distribution_uniform = std::uniform_real_distribution<double>(0.0, 1.0);
     m_distribution_normal  = std::normal_distribution<double>(0.0, 1.0);
+}
+
+void SimulationADMC::ComputePhysicalData(const double temperature) {
+    std::size_t         nb_pts = m_x_line.size();
+    std::vector<double> m_eMobility(nb_pts);
+    std::vector<double> m_hMobility(nb_pts);
+
+    for (std::size_t idx = 0; idx < nb_pts; ++idx) {
+        m_eMobility[idx]  = physic::model::electron_mobility_arora_canali(m_doping[idx], m_ElectricField[idx], temperature);
+        m_hMobility[idx]  = physic::model::hole_mobility_arora_canali(m_doping[idx], m_ElectricField[idx], temperature);
+        m_eVelocity[idx]  = -m_ElectricField[idx] * m_eMobility[idx];
+        m_hVelocity[idx]  = m_ElectricField[idx] * m_hMobility[idx];
+        m_eDiffusion[idx] = m_eMobility[idx] * physic::constant::boltzmann_constant * temperature / physic::constant::elementary_charge;
+        m_hDiffusion[idx] = m_eMobility[idx] * physic::constant::boltzmann_constant * temperature / physic::constant::elementary_charge;
+    }
+    m_eDivDiffusion = Utils::gradient(m_x_line, m_eDiffusion);
+    m_hDivDiffusion = Utils::gradient(m_x_line, m_hDiffusion);
+
+    // const std::string                filename = "file_data_admc.csv";
+    // std::vector<std::string>         headers  = {"xline", "doping", "efield", "eMob", "hMob", "eVel", "hVel", "eDiff", "hDiff", "eDivDiff", "hDivDiff"};
+    // std::vector<std::vector<double>> DATA =
+    //     {m_x_line, m_doping, m_ElectricField, m_eMobility, m_hMobility, m_eVelocity, m_hVelocity, m_eDiffusion, m_hDiffusion, m_eDivDiffusion, m_hDivDiffusion};
+    // std::cout << "Exporting data to ...\n";
+    // Utils::export_multiple_vector_to_csv(filename, headers, DATA);
 }
 
 void SimulationADMC::AddElectrons(std::size_t number_of_electrons) {
@@ -137,11 +167,18 @@ void SimulationADMC::SetDataFromDeviceStep() {
     std::vector<double> x_positions               = this->get_all_x_positions();
     std::vector<double> InterpolatedDoping        = Utils::interp1dSorted(m_x_line, m_doping, x_positions);
     std::vector<double> InterpolatedElectricField = Utils::interp1dSorted(m_x_line, m_ElectricField, x_positions);
+    std::vector<double> e_interpolated_div_diff = Utils::interp1dSorted(m_x_line, m_eDivDiffusion, x_positions);
+    std::vector<double> h_interpolated_div_diff = Utils::interp1dSorted(m_x_line, m_hDivDiffusion, x_positions);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
         m_particles[idx_part].set_doping(InterpolatedDoping[idx_part]);
         m_particles[idx_part].set_electric_field({InterpolatedElectricField[idx_part], 0.0, 0.0});
         m_particles[idx_part].compute_mobility();
         m_particles[idx_part].compute_velocity();
+        // if (m_particles[idx_part].type() == ParticleType::electron) {
+        //     m_particles[idx_part].set_velocity({m_particles[idx_part].velocity().x() + e_interpolated_div_diff[idx_part], 0, 0});
+        // } else {
+        //     m_particles[idx_part].set_velocity({m_particles[idx_part].velocity().x() + h_interpolated_div_diff[idx_part], 0, 0});
+        // }
     }
 }
 
@@ -215,7 +252,7 @@ std::vector<double> SimulationADMC::RunTransportSimulationToMaxField() {
     auto                it_max_field = std::max_element(m_ElectricField.begin(), m_ElectricField.end());
     double              x_max_field  = m_x_line[std::distance(m_ElectricField.begin(), it_max_field)];
     std::vector<double> times_to_max_field;
-    const double tol_x = 2.0e-3;
+    const double        tol_x = 2.0e-3;
     while (m_time < m_parameters.m_max_time && m_particles.size() > 0) {
         SetDataFromDeviceStep();
         PerformDriftDiffusionStep();
@@ -339,6 +376,7 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         int                 nb_avalanches_point = 0;
         for (std::size_t idx_sim = 0; idx_sim < nb_simulation_per_points; ++idx_sim) {
             SimulationADMC simulation(parameters, device, voltage);
+            simulation.ComputePhysicalData(300.0);
             simulation.AddElectrons(1, {x_line[idx_x], 0.5, 0.5});
             simulation.RunSimulation();
             if (simulation.get_history().m_has_reached_avalanche) {
@@ -386,7 +424,6 @@ void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
                                       std::size_t           nb_simulation_per_points,
                                       std::size_t           nbPointsX,
                                       const std::string&    export_name) {
-
     std::filesystem::create_directory("TEST_FIELD");
 
     double              x_max  = device.get_doping_profile().get_x_line().back();
@@ -396,7 +433,7 @@ void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
         // std::cout << "Running simulation on point " << x_line[idx_x] << std::endl;
-        SimulationADMC      simulation(parameters, device, voltage);
+        SimulationADMC simulation(parameters, device, voltage);
         simulation.AddElectrons(nb_simulation_per_points, {x_line[idx_x], 0.5, 0.5});
         std::vector<double> time_to_max_field = simulation.RunTransportSimulationToMaxField();
         // Add the avalanche times to the global vector

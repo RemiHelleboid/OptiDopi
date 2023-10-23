@@ -75,20 +75,20 @@ int main(int argc, char** argv) {
     // simulation_admc.AddElectrons(1, {2.5, 0.5, 0.5});
     // simulation_admc.RunSimulation();
 
-    std::size_t nb_simulation_per_point = 200;
-    std::size_t NbPointsX               = 100;
+    std::size_t nb_simulation_per_point = 100;
+    std::size_t NbPointsX               = 1000;
     std::cout << "Start ADMC simulation" << std::endl;
     // ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX);
-    // my_device.DeviceADMCSimulation(parameters_admc,
-    //                                voltage_AMDC,
-    //                                nb_simulation_per_point,
-    //                                NbPointsX,
-    //                                fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
-    my_device.DeviceADMCSimulationToMaxField(parameters_admc,
-                                             voltage_AMDC,
-                                             nb_simulation_per_point,
-                                             NbPointsX,
-                                             fmt::format("SimpleSPAD_MField_{:.2f}_", voltage_AMDC));
+    my_device.DeviceADMCSimulation(parameters_admc,
+                                   voltage_AMDC,
+                                   nb_simulation_per_point,
+                                   NbPointsX,
+                                   fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
+    // my_device.DeviceADMCSimulationToMaxField(parameters_admc,
+    //                                          voltage_AMDC,
+    //                                          nb_simulation_per_point,
+    //                                          NbPointsX,
+    //                                          fmt::format("SimpleSPAD_MField_{:.2f}_", voltage_AMDC));
 
     auto                          end             = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed_seconds = end - start;

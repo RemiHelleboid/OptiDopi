@@ -2,12 +2,12 @@
  *
  */
 
+#include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <fmt/xchar.h>
-#include <fmt/chrono.h>
 #include <omp.h>
 
 #include <filesystem>
@@ -20,7 +20,6 @@
 #include "McIntyre.hpp"
 #include "PoissonSolver1D.hpp"
 #include "fill_vector.hpp"
-
 
 int main(int argc, char** argv) {
     fmt::print("Start of the program {}.\n", argv[0]);
@@ -49,7 +48,7 @@ int main(int argc, char** argv) {
         const double doping_acceptor = list_doping_acceptor[i];
         for (int idx_length = 0; idx_length < nb_length_intrinsic; ++idx_length) {
             const double length_intrinsic = list_length_intrisic[idx_length];
-            Device1D       my_device;
+            Device1D     my_device;
             my_device.setup_pin_diode(total_length,
                                       number_points,
                                       length_donor,
@@ -59,23 +58,24 @@ int main(int argc, char** argv) {
                                       doping_intrinsic);
             my_device.smooth_doping_profile(10);
             my_device.export_doping_profile("doping_profile.csv");
-            double    target_anode_voltage = 50.0;
-            double    tol                  = 1.0e-6;
-            const int max_iter             = 100;
-            double    voltage_step         = 0.01;
-            my_device.solve_poisson(target_anode_voltage, tol, max_iter);
-            // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
-
-            const double stop_above_bv         = 3.0;
+            double       target_anode_voltage  = 150.0;
+            double       tol                   = 1.0e-6;
+            const int    max_iter              = 100;
+            double       voltage_step          = 0.01;
             double       mcintyre_voltage_step = 0.25;
-            my_device.solve_mcintyre(mcintyre_voltage_step, stop_above_bv);
+            const double stop_above_bv         = 5.0;
+            double       BiasAboveBV           = 2.0;
+
+            my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
+
+            // my_device.export_poisson_solution("poisson_solution", "poisson_solution_");
             const double brp_threshold = 1e-3;
             double       BV            = my_device.extract_breakdown_voltage(brp_threshold);
 
-            double BiasAboveBV               = 3.0;
             double BrP_at_Biasing            = my_device.get_brp_at_voltage(BV + BiasAboveBV);
             double DepletionWidth_at_Biasing = my_device.get_depletion_at_voltage(BV + BiasAboveBV);
-            if (omp_get_thread_num() == 0) {
+            double max_electric_field        = my_device.get_poisson_solution_at_voltage(BV + BiasAboveBV).get_max_electric_field();
+            if (omp_get_thread_num() != -1) {
                 fmt::print("({}/{}) \t Acceptor : {:.2e} \t Intrinsic : {:.2e} \t BV : {:.2f} V \t BrP : {:.0f}% \t Depletion : {:.1f} \n",
                            i * number_acceptor_points + idx_length,
                            number_acceptor_points * nb_length_intrinsic,
@@ -95,10 +95,10 @@ int main(int argc, char** argv) {
     // Get the current time
     auto time = std::time(nullptr);
     // Convert to local time
-    auto local_time = *std::localtime(&time);
+    auto        local_time  = *std::localtime(&time);
     std::string time_string = fmt::format("{:%Y-%m-%d_%H-%M-%S}", local_time);
-    std::string filename   = fmt::format("BV_list_{}.csv", time_string);
-    
+    std::string filename    = fmt::format("BV_list_{}.csv", time_string);
+
     std::ofstream BV_file(filename);
     BV_file << "Acceptor,L_intrinsic,BV,BrP,Depletion" << std::endl;
     for (int i = 0; i < number_acceptor_points; ++i) {

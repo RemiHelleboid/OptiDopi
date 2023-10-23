@@ -74,6 +74,11 @@ class SimulationADMC {
     std::vector<double> m_eVelocity;
     std::vector<double> m_hVelocity;
 
+    std::vector<double> m_eDiffusion;
+    std::vector<double> m_hDiffusion;                                     
+    std::vector<double> m_eDivDiffusion;
+    std::vector<double> m_hDivDiffusion;                                     
+
     std::mt19937                           m_generator;
     std::uniform_real_distribution<double> m_distribution_uniform;
     std::normal_distribution<double>       m_distribution_normal;
@@ -83,6 +88,8 @@ class SimulationADMC {
  public:
     SimulationADMC(const ParametersADMC& parameters);
     SimulationADMC(const ParametersADMC& parameters, const Device1D& device, double voltage);
+
+    void ComputePhysicalData(const double temperature);
 
     const ADMCSimulationHistory& get_history() const { return m_history; }
     double                       get_time() const { return m_history.m_time.back(); }

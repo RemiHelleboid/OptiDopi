@@ -123,10 +123,11 @@ class Device1D {
                                                            double             DZ,
                                                            std::size_t        NY,
                                                            std::size_t        NZ) const;
-    PoissonSolution get_poisson_solution_at_voltage(double voltage) const;
+    const PoissonSolution& get_poisson_solution_at_voltage(double voltage) const;
 
     const std::vector<double>&          get_list_voltages() const { return m_list_voltages; }
     const std::vector<PoissonSolution>& get_list_poisson_solutions() const { return m_list_poisson_solutions; }
+    const PoissonSolution&              get_poisson_solution_at_index(std::size_t index) const { return m_list_poisson_solutions[index]; }
     std::vector<double>                 get_list_depletion_width() const;
     void                                export_depletion_width(const std::string& directory_name, const std::string& prefix) const;
 

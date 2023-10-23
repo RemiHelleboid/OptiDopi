@@ -10,9 +10,9 @@
 #include <random>
 #include <vector>
 
+#include "DopingProfile1D.hpp"
 #include "McIntyre.hpp"
 #include "Physics.hpp"
-#include "DopingProfile1D.hpp"
 
 typedef Eigen::SparseLU<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> SolverSparseLU;
 
@@ -39,6 +39,8 @@ struct PoissonSolution {
                     std::vector<double> electric_field);
 
     PoissonSolution() = default;
+
+    double get_max_electric_field() const { return *std::max_element(m_electric_field.begin(), m_electric_field.end()); }
 
     void export_to_file(const std::string& filename) const;
 };

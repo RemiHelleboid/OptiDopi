@@ -366,7 +366,8 @@ void NewtonPoissonSolver::newton_solver_with_mcintyre(const double      final_an
     const double cathode_voltage = 0.0;
     const double doping_anode    = m_doping_concentration(0);
     const double doping_cathode  = m_doping_concentration(m_x_line.size() - 1);
-    voltage_step                 = 1.0 * m_thermal_voltage;
+    // voltage_step                 = 1.0 * m_thermal_voltage;
+    voltage_step = 0.02;
     // fmt::print("thermal voltage: {:.3e}\n", m_thermal_voltage);
 
     std::vector<double> m_xline_vector(m_x_line.data(), m_x_line.data() + m_x_line.size());
