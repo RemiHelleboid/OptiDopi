@@ -81,9 +81,10 @@ void SimulationADMC::ComputePhysicalData(const double temperature) {
     m_hDivDiffusion = Utils::gradient(m_x_line, m_hDiffusion);
 
     // const std::string                filename = "file_data_admc.csv";
-    // std::vector<std::string>         headers  = {"xline", "doping", "efield", "eMob", "hMob", "eVel", "hVel", "eDiff", "hDiff", "eDivDiff", "hDivDiff"};
-    // std::vector<std::vector<double>> DATA =
-    //     {m_x_line, m_doping, m_ElectricField, m_eMobility, m_hMobility, m_eVelocity, m_hVelocity, m_eDiffusion, m_hDiffusion, m_eDivDiffusion, m_hDivDiffusion};
+    // std::vector<std::string>         headers  = {"xline", "doping", "efield", "eMob", "hMob", "eVel", "hVel", "eDiff", "hDiff",
+    // "eDivDiff", "hDivDiff"}; std::vector<std::vector<double>> DATA =
+    //     {m_x_line, m_doping, m_ElectricField, m_eMobility, m_hMobility, m_eVelocity, m_hVelocity, m_eDiffusion, m_hDiffusion,
+    //     m_eDivDiffusion, m_hDivDiffusion};
     // std::cout << "Exporting data to ...\n";
     // Utils::export_multiple_vector_to_csv(filename, headers, DATA);
 }
@@ -167,8 +168,8 @@ void SimulationADMC::SetDataFromDeviceStep() {
     std::vector<double> x_positions               = this->get_all_x_positions();
     std::vector<double> InterpolatedDoping        = Utils::interp1dSorted(m_x_line, m_doping, x_positions);
     std::vector<double> InterpolatedElectricField = Utils::interp1dSorted(m_x_line, m_ElectricField, x_positions);
-    std::vector<double> e_interpolated_div_diff = Utils::interp1dSorted(m_x_line, m_eDivDiffusion, x_positions);
-    std::vector<double> h_interpolated_div_diff = Utils::interp1dSorted(m_x_line, m_hDivDiffusion, x_positions);
+    std::vector<double> e_interpolated_div_diff   = Utils::interp1dSorted(m_x_line, m_eDivDiffusion, x_positions);
+    std::vector<double> h_interpolated_div_diff   = Utils::interp1dSorted(m_x_line, m_hDivDiffusion, x_positions);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
         m_particles[idx_part].set_doping(InterpolatedDoping[idx_part]);
         m_particles[idx_part].set_electric_field({InterpolatedElectricField[idx_part], 0.0, 0.0});
@@ -355,12 +356,12 @@ void SimulationADMC::ExportCurrentState() const {
  * @param nb_simulation_per_points
  */
 void MainFullADMCSimulation(const ParametersADMC& parameters,
-                            const Device1D&       device,
+                            Device1D*             p_device,
                             double                voltage,
                             std::size_t           nb_simulation_per_points,
                             std::size_t           nbPointsX,
                             const std::string&    export_name) {
-    double x_max = device.get_doping_profile().get_x_line().back();
+    double x_max = p_device->get_doping_profile().get_x_line().back();
 
     std::vector<double> x_line = utils::linspace(0.0, x_max, nbPointsX);
 
@@ -368,14 +369,13 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
     std::vector<double> eBreakdownRatio(x_line.size(), 0.0);
 
     std::size_t nb_avalanches = 0;
-#pragma omp parallel for schedule(dynamic) reduction(+ : nb_avalanches)
     for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
         // std::cout << "Running simulation on point " << x_line[idx_x] << std::endl;
         std::vector<double> avalanche_times_point;
         std::vector<double> eBreakdownRatio_point;
         int                 nb_avalanches_point = 0;
         for (std::size_t idx_sim = 0; idx_sim < nb_simulation_per_points; ++idx_sim) {
-            SimulationADMC simulation(parameters, device, voltage);
+            SimulationADMC simulation(parameters, *p_device, voltage);
             simulation.ComputePhysicalData(300.0);
             simulation.AddElectrons(1, {x_line[idx_x], 0.5, 0.5});
             simulation.RunSimulation();
@@ -388,11 +388,10 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         double ratio           = static_cast<double>(nb_avalanches_point) / static_cast<double>(nb_simulation_per_points);
         eBreakdownRatio[idx_x] = ratio;
         // Add the avalanche times to the global vector
-#pragma omp critical
         { all_avalanche_times.insert(all_avalanche_times.end(), avalanche_times_point.begin(), avalanche_times_point.end()); }
     }
     double ratio = static_cast<double>(nb_avalanches) / static_cast<double>(nb_simulation_per_points * x_line.size());
-    std::cout << "Avalanche Breakdown ratio: " << ratio << std::endl;
+    // std::cout << "Avalanche Breakdown ratio: " << ratio << std::endl;
     // Export the avalanche times to a file
     std::ofstream file_avalanche_times(export_name + "AvalancheTimes.csv");
     file_avalanche_times << "TimeAvalanche" << std::endl;
@@ -408,6 +407,17 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         file_breakdown_ratio << x_line[idx_x] << "," << eBreakdownRatio[idx_x] << std::endl;
     }
     file_breakdown_ratio.close();
+
+    // Stats
+    double mean_time               = utils::mean(all_avalanche_times);
+    double jitter_50               = utils::percentile(all_avalanche_times, 50.0);
+    double jitter_90               = utils::percentile(all_avalanche_times, 90.0);
+    double jitter_95               = utils::percentile(all_avalanche_times, 95.0);
+    p_device->m_result_simu.jitter_50 = jitter_50;
+    p_device->m_result_simu.jitter_90 = jitter_90;
+    p_device->m_result_simu.jitter_99 = jitter_95;
+    std::cout << "Mean time to avalanche: " << mean_time << std::endl;
+    std::cout << "Jitter 50: " << jitter_50 << std::endl;
 }
 
 /**

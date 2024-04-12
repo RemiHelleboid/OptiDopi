@@ -52,7 +52,7 @@ class NewtonPoissonSolver {
     std::size_t                  m_number_points;
     const double                 m_temperature                     = 300.0;
     const double                 m_thermal_voltage                 = boltzmann_constant_eV * m_temperature;
-    const double                 m_intrisinc_carrier_concentration = 1.1e16;
+    const double                 m_intrinsic_carrier_concentration = 1.1e16;
     Eigen::SparseMatrix<double>  m_matrix;
     Eigen::VectorXd              m_vector_rhs;
     Eigen::VectorXd              m_solution;

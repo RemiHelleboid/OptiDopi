@@ -75,9 +75,9 @@ class SimulationADMC {
     std::vector<double> m_hVelocity;
 
     std::vector<double> m_eDiffusion;
-    std::vector<double> m_hDiffusion;                                     
+    std::vector<double> m_hDiffusion;
     std::vector<double> m_eDivDiffusion;
-    std::vector<double> m_hDivDiffusion;                                     
+    std::vector<double> m_hDivDiffusion;
 
     std::mt19937                           m_generator;
     std::uniform_real_distribution<double> m_distribution_uniform;
@@ -180,7 +180,7 @@ class SimulationADMC {
 };
 
 void MainFullADMCSimulation(const ParametersADMC& parameters,
-                            const Device1D&       device,
+                            Device1D*             p_device,
                             double                voltage,
                             std::size_t           nb_simulation_per_points,
                             std::size_t           nbPointsX,

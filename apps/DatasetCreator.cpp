@@ -76,7 +76,8 @@ cost_function_result main_function_spad_complex(double                     donor
                                                 double                     donor_level,
                                                 double                     total_length,
                                                 const std::vector<double>& x_acceptor,
-                                                const std::vector<double>& doping_acceptor) {
+                                                const std::vector<double>& doping_acceptor,
+                                                bool                       run_admc = false) {
     std::size_t number_points    = 500;
     double      intrinsic_length = 0.0;
     double      intrinsic_level  = 1.0e13;
@@ -107,6 +108,41 @@ cost_function_result main_function_spad_complex(double                     donor
         // fmt::print(std::cerr, "Poisson failed\n");
     }
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, 1.0);
+
+    if (run_admc) {
+        fmt::print("Start Advection Diffusion Monte Carlo\n");
+        double temperature = 300.0;
+        double time_step   = 1.0e-14;
+        double final_time  = 5.0e-9;
+
+        ADMC::ParametersADMC parameters_admc;
+        parameters_admc.m_time_step                  = time_step;
+        parameters_admc.m_max_time                   = final_time;
+        parameters_admc.m_temperature                = temperature;
+        parameters_admc.m_activate_impact_ionization = true;
+        parameters_admc.m_activate_particle_creation = true;
+        parameters_admc.m_max_particles              = 100;
+        parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
+        parameters_admc.m_output_file                = "ADMC_0/ADMC_0_";
+
+        double BV           = cost_result.result.BV;
+        double voltage_AMDC = BV + BiasAboveBV;
+        my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20);
+
+        std::size_t nb_simulation_per_point = 10;
+        std::size_t NbPointsX               = 10;
+        std::cout << "Start ADMC simulation" << std::endl;
+        ADMC::MainFullADMCSimulation(parameters_admc, &my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX, "/dev/null");
+        my_device.DeviceADMCSimulation(parameters_admc,
+                                       voltage_AMDC,
+                                       nb_simulation_per_point,
+                                       NbPointsX,
+                                       fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
+        double jitter_50 = my_device.m_result_simu.jitter_50;
+        double jitter_90 = my_device.m_result_simu.jitter_90;
+        cost_result.result.jitter_50 = jitter_50;
+        cost_result.result.jitter_90 = jitter_90;
+    }
 
     return cost_result;
 }
@@ -227,10 +263,13 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     std::vector<double> BreakdownVoltages(nb_samples);
     std::vector<double> BreakdownProbabilities(nb_samples);
     std::vector<double> DepletionWidths(nb_samples);
+    std::vector<double> Jitter50(nb_samples);
+    std::vector<double> Jitter90(nb_samples);
     std::vector<int>    failed_samples(nb_samples);
 
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < nb_samples; ++i) {
+        std::cout << "i = " << i << std::endl;
         std::random_device               rd;
         std::mt19937                     gen(rd());
         double                           total_length = dis_total_length(gen);
@@ -260,12 +299,16 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
         doping_levels[i]   = my_device.get_doping_profile().get_doping_concentration();
         total_lengths[i]   = total_length;
         donor_lengths[i]   = donor_length;
+        bool run_admc      = true;
         try {
             cost_function_result cost_result =
-                main_function_spad_complex(donor_length, donor_level, total_length, acceptor_x, acceptor_lev);
+                main_function_spad_complex(donor_length, donor_level, total_length, acceptor_x, acceptor_lev, run_admc);
             BreakdownVoltages[i]      = cost_result.result.BV;
             BreakdownProbabilities[i] = cost_result.result.BrP;
             DepletionWidths[i]        = cost_result.result.DW * 1.0e6;
+            Jitter50[i]               = cost_result.result.jitter_50;
+            Jitter90[i]               = cost_result.result.jitter_90;
+
         } catch (const std::exception& e) {
             failed_samples[i] = 1;
             continue;
@@ -295,7 +338,7 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
     for (std::size_t i = 0; i < number_points; ++i) {
         file << fmt::format(",Acceptors_{}", i);
     }
-    file << ",BreakdownVoltage,BreakdownProbability,DepletionWidth\n";
+    file << ",BreakdownVoltage,BreakdownProbability,DepletionWidth,Jitter50,Jitter90\n";
     for (std::size_t i = 0; i < nb_samples; ++i) {
         if (failed_samples[i] == 1) {
             continue;
@@ -307,7 +350,12 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
         for (std::size_t j = 0; j < number_points; ++j) {
             file << fmt::format(",{:.3e}", acceptor_levels[i][j]);
         }
-        file << fmt::format(",{:.3f},{:.3f},{:.3f}\n", BreakdownVoltages[i], BreakdownProbabilities[i], DepletionWidths[i]);
+        file << fmt::format(",{:.3f},{:.3f},{:.3f},{:.3e},{:.3e}\n",
+                            BreakdownVoltages[i],
+                            BreakdownProbabilities[i],
+                            DepletionWidths[i],
+                            Jitter50[i],
+                            Jitter90[i]);
     }
     file.close();
 }

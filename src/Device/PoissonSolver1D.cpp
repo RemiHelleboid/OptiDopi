@@ -161,13 +161,13 @@ void NewtonPoissonSolver::set_doping_profile(const doping_profile& my_doping_pro
 
 void NewtonPoissonSolver::compute_electron_density(const double applied_voltage) {
     for (std::size_t i = 0; i < m_number_points; ++i) {
-        m_electron_density(i) = m_intrisinc_carrier_concentration * std::exp((m_solution(i) - applied_voltage) / m_thermal_voltage);
+        m_electron_density(i) = m_intrinsic_carrier_concentration * std::exp((m_solution(i) - applied_voltage) / m_thermal_voltage);
     }
 }
 
 void NewtonPoissonSolver::compute_hole_density(const double applied_voltage) {
     for (std::size_t i = 0; i < m_number_points; ++i) {
-        m_hole_density(i) = m_intrisinc_carrier_concentration * std::exp((applied_voltage - m_solution(i)) / m_thermal_voltage);
+        m_hole_density(i) = m_intrinsic_carrier_concentration * std::exp((applied_voltage - m_solution(i)) / m_thermal_voltage);
     }
 }
 
@@ -190,13 +190,13 @@ void NewtonPoissonSolver::compute_initial_guess() {
         const double doping = m_doping_concentration(index_x);
         if (doping > 0.0) {
             const double value_inside_log =
-                doping / (2.0 * m_intrisinc_carrier_concentration) +
-                sqrt(1 + (doping * doping / (4.0 * m_intrisinc_carrier_concentration * m_intrisinc_carrier_concentration)));
+                doping / (2.0 * m_intrinsic_carrier_concentration) +
+                sqrt(1 + (doping * doping / (4.0 * m_intrinsic_carrier_concentration * m_intrinsic_carrier_concentration)));
             m_solution(index_x) = m_thermal_voltage * log(value_inside_log);
         } else {
             const double inverse_value_inside_log =
-                sqrt(1 + ((doping * doping) / (4.0 * m_intrisinc_carrier_concentration * m_intrisinc_carrier_concentration))) -
-                doping / (2.0 * m_intrisinc_carrier_concentration);
+                sqrt(1 + ((doping * doping) / (4.0 * m_intrinsic_carrier_concentration * m_intrinsic_carrier_concentration))) -
+                doping / (2.0 * m_intrinsic_carrier_concentration);
             m_solution(index_x) = m_thermal_voltage * log(1.0 / inverse_value_inside_log);
         }
     }
@@ -208,13 +208,13 @@ double NewtonPoissonSolver::compute_boundary_conditions(const double applied_vol
     double       v_contact      = applied_voltage;
     const double doping_contact = doping;
     if (doping_contact >= 0) {
-        v_contact += -m_thermal_voltage * log(doping_contact / (2.0 * m_intrisinc_carrier_concentration) +
-                                              sqrt(1 + std::pow(doping_contact / (2.0 * m_intrisinc_carrier_concentration), 2.0)));
+        v_contact += -m_thermal_voltage * log(doping_contact / (2.0 * m_intrinsic_carrier_concentration) +
+                                              sqrt(1 + std::pow(doping_contact / (2.0 * m_intrinsic_carrier_concentration), 2.0)));
     } else {
         v_contact +=
             -m_thermal_voltage * log(1.0 / (sqrt(1 + (doping_contact * doping_contact /
-                                                      (4.0 * m_intrisinc_carrier_concentration * m_intrisinc_carrier_concentration))) -
-                                            doping_contact / (2.0 * m_intrisinc_carrier_concentration)));
+                                                      (4.0 * m_intrinsic_carrier_concentration * m_intrinsic_carrier_concentration))) -
+                                            doping_contact / (2.0 * m_intrinsic_carrier_concentration)));
     }
     return v_contact;
 }

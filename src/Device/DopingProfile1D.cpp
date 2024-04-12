@@ -13,6 +13,8 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -84,6 +86,40 @@ void doping_profile::set_up_pin_diode(double      x_min,
     }
     re_compute_total_doping();
 }
+
+void doping_profile::load_doping_profile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        throw std::logic_error("Error: Cannot open file " + filename + " for reading.");
+    }
+    std::string line;
+    std::getline(file, line);
+    std::size_t number_points = 0;
+    while (std::getline(file, line)) {
+        number_points++;
+    }
+    file.close();
+    file.open(filename);
+    std::getline(file, line);
+    m_x_line.resize(number_points);
+    m_donor_concentration.resize(number_points);
+    m_donor_concentration.resize(number_points);
+    m_acceptor_concentration.resize(number_points);
+    for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
+        std::getline(file, line);
+        std::istringstream iss(line);
+        double              x_position, donor_concentration, acceptor_concentration;
+        if (!(iss >> x_position >> donor_concentration >> acceptor_concentration)) {
+            throw std::runtime_error("Error reading file");
+        }
+        m_x_line[index_x]                 = x_position;
+        m_donor_concentration[index_x]    = donor_concentration;
+        m_acceptor_concentration[index_x] = acceptor_concentration;
+    }
+    re_compute_total_doping();
+    
+}
+
 
 void doping_profile::set_up_advanced_pin(double              xlength,
                                          std::size_t         number_points,

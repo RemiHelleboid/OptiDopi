@@ -27,15 +27,24 @@ int main(int argc, char** argv) {
     double doping_acceptor = 5.0e16;
 
     Device1D my_device;
-    my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
-    my_device.smooth_doping_profile(5);
+    std::string filename_doping = "";
+    if (argc > 1) {
+        filename_doping = argv[1];
+        doping_profile doping_profile;
+        doping_profile.load_doping_profile(filename_doping);
+        my_device.add_doping_profile(doping_profile);
+    } else {
+        my_device.setup_pin_diode(total_length, number_points, length_donor, length_intrinsic, doping_donor, doping_acceptor, doping_intrinsic);
+        my_device.smooth_doping_profile(5);
+    }
+
 
     // Solve the Poisson and McIntyre equations
     double       target_anode_voltage  = 100.0;
     double       tol                   = 1.0e-8;
     const int    max_iter              = 1000;
     double       mcintyre_voltage_step = 0.25;
-    const double stop_above_bv         = 5.0;
+    const double stop_above_bv         = 15.0;
     double       BiasAboveBV           = 3.0;
 
     my_device.solve_poisson_and_mcintyre(target_anode_voltage, tol, max_iter, mcintyre_voltage_step, stop_above_bv);
@@ -43,6 +52,8 @@ int main(int argc, char** argv) {
     if (!poisson_success) {
         fmt::print("Poisson failed\n");
     }
+    std::filesystem::create_directory("POISSON_NL");
+    my_device.export_mcintyre_solution("POISSON_NL/", "McIntyre_");
     cost_function_result cost_result = my_device.compute_cost_function(BiasAboveBV, 0.0);
     double               BV          = cost_result.result.BV;
     double               BRP         = cost_result.result.BrP;
@@ -65,7 +76,6 @@ int main(int argc, char** argv) {
     parameters_admc.m_max_particles              = 100;
     parameters_admc.m_avalanche_threshold        = parameters_admc.m_max_particles;
     parameters_admc.m_output_file                = "ADMC_0/ADMC_0_";
-    std::filesystem::create_directory("ADMC_0");
 
     double voltage_AMDC = BV + BiasAboveBV;
     my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20);
@@ -79,11 +89,11 @@ int main(int argc, char** argv) {
     std::size_t NbPointsX               = 1000;
     std::cout << "Start ADMC simulation" << std::endl;
     // ADMC::MainFullADMCSimulation(parameters_admc, my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX);
-    my_device.DeviceADMCSimulation(parameters_admc,
-                                   voltage_AMDC,
-                                   nb_simulation_per_point,
-                                   NbPointsX,
-                                   fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
+    // my_device.DeviceADMCSimulation(parameters_admc,
+    //                                voltage_AMDC,
+    //                                nb_simulation_per_point,
+    //                                NbPointsX,
+    //                                fmt::format("SimpleSPAD_{:.2f}_", voltage_AMDC));
     // my_device.DeviceADMCSimulationToMaxField(parameters_admc,
     //                                          voltage_AMDC,
     //                                          nb_simulation_per_point,

@@ -23,8 +23,8 @@ int main(int argc, const char** argv) {
         fmt::print("Usage: {} NbParticles NbIterMax \n", argv[0]);
         fmt::print("Using default values: NbParticles = {}, NbIterMax = {} \n", nb_particles, nb_iter_max);
     }
-    const double c1 = 3.5;
-    const double c2 = 1.5;
+    const double c1 = 1.60;
+    const double c2 = 3.70;
     const double w  = 0.9;
 
     auto start = std::chrono::high_resolution_clock::now();
