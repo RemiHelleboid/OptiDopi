@@ -409,14 +409,14 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
     file_breakdown_ratio.close();
 
     // Stats
-    double mean_time               = utils::mean(all_avalanche_times);
-    double jitter_50               = utils::percentile(all_avalanche_times, 50.0);
-    double jitter_90               = utils::percentile(all_avalanche_times, 90.0);
-    double jitter_95               = utils::percentile(all_avalanche_times, 95.0);
+    double mean_time                  = utils::mean(all_avalanche_times);
+    double jitter_50                  = utils::percentile(all_avalanche_times, 50.0);
+    double jitter_90                  = utils::percentile(all_avalanche_times, 90.0);
+    double jitter_95                  = utils::percentile(all_avalanche_times, 95.0);
     p_device->m_result_simu.jitter_50 = jitter_50;
     p_device->m_result_simu.jitter_90 = jitter_90;
     p_device->m_result_simu.jitter_99 = jitter_95;
-    std::cout << "Mean time to avalanche: " << mean_time << std::endl;
+    // std::cout << "Mean time to avalanche: " << mean_time << std::endl;
     std::cout << "Jitter 50: " << jitter_50 << std::endl;
 }
 
@@ -429,26 +429,24 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
  * @param nb_simulation_per_points
  */
 void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
-                                      const Device1D&       device,
+                                      Device1D*             p_device,
                                       double                voltage,
                                       std::size_t           nb_simulation_per_points,
                                       std::size_t           nbPointsX,
                                       const std::string&    export_name) {
     std::filesystem::create_directory("TEST_FIELD");
 
-    double              x_max  = device.get_doping_profile().get_x_line().back();
+    double              x_max  = p_device->get_doping_profile().get_x_line().back();
     std::vector<double> x_line = utils::linspace(0.0, x_max, nbPointsX);
     std::vector<double> all_transport_times;
 
-#pragma omp parallel for schedule(dynamic)
     for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
         // std::cout << "Running simulation on point " << x_line[idx_x] << std::endl;
-        SimulationADMC simulation(parameters, device, voltage);
+        SimulationADMC simulation(parameters, *p_device, voltage);
         simulation.AddElectrons(nb_simulation_per_points, {x_line[idx_x], 0.5, 0.5});
         std::vector<double> time_to_max_field = simulation.RunTransportSimulationToMaxField();
         // Add the avalanche times to the global vector
-#pragma omp critical
-        { all_transport_times.insert(all_transport_times.end(), time_to_max_field.begin(), time_to_max_field.end()); }
+        all_transport_times.insert(all_transport_times.end(), time_to_max_field.begin(), time_to_max_field.end());
         std::ofstream file_transport_times("TEST_FIELD/TimeToMaxField_" + std::to_string(idx_x) + "_.csv");
         file_transport_times << "TimeToMaxField" << std::endl;
         for (const auto& time : time_to_max_field) {
@@ -465,6 +463,17 @@ void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
         file_avalanche_times << time << std::endl;
     }
     file_avalanche_times.close();
+
+    // Stats
+    double mean_time                  = utils::mean(all_transport_times);
+    double jitter_50                  = utils::percentile(all_transport_times, 50.0);
+    double jitter_90                  = utils::percentile(all_transport_times, 90.0);
+    double jitter_95                  = utils::percentile(all_transport_times, 95.0);
+    p_device->m_result_simu.jitter_50 = jitter_50;
+    p_device->m_result_simu.jitter_90 = jitter_90;
+    p_device->m_result_simu.jitter_99 = jitter_95;
+    // std::cout << "Mean time to avalanche: " << mean_time << std::endl;
+    std::cout << "Jitter 50: " << jitter_50 << std::endl;
 }
 
 // void ExportAllParticlesHistory() const;

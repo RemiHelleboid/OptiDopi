@@ -112,7 +112,7 @@ cost_function_result main_function_spad_complex(double                     donor
     if (run_admc) {
         fmt::print("Start Advection Diffusion Monte Carlo\n");
         double temperature = 300.0;
-        double time_step   = 1.0e-14;
+        double time_step   = 1.0e-12;
         double final_time  = 5.0e-9;
 
         ADMC::ParametersADMC parameters_admc;
@@ -130,10 +130,9 @@ cost_function_result main_function_spad_complex(double                     donor
         my_device.export_poisson_at_voltage_3D_emulation(voltage_AMDC, "ADMC_0/", "", 1.0, 1.0, 20, 20);
 
         std::size_t nb_simulation_per_point = 10;
-        std::size_t NbPointsX               = 10;
+        std::size_t NbPointsX               = 100;
         std::cout << "Start ADMC simulation" << std::endl;
-        ADMC::MainFullADMCSimulation(parameters_admc, &my_device, voltage_AMDC, nb_simulation_per_point, NbPointsX, "/dev/null");
-        my_device.DeviceADMCSimulation(parameters_admc,
+        my_device.DeviceADMCSimulationToMaxField(parameters_admc,
                                        voltage_AMDC,
                                        nb_simulation_per_point,
                                        NbPointsX,
@@ -269,7 +268,6 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
 
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < nb_samples; ++i) {
-        std::cout << "i = " << i << std::endl;
         std::random_device               rd;
         std::mt19937                     gen(rd());
         double                           total_length = dis_total_length(gen);

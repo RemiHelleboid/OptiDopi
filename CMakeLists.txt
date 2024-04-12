@@ -69,7 +69,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 message("Optimization for the local machine is enabled")
-add_compile_options(-march=native)
+# add_compile_options(-march=native)
 
 
 find_package(Eigen3 NO_MODULE)

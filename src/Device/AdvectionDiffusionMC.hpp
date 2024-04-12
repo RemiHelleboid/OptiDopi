@@ -187,7 +187,7 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
                             const std::string&    export_name);
 
 void MainFullADMCSimulationToMaxField(const ParametersADMC& parameters,
-                                      const Device1D&       device,
+                                      Device1D*             device,
                                       double                voltage,
                                       std::size_t           nb_simulation_per_points,
                                       std::size_t           nbPointsX,
