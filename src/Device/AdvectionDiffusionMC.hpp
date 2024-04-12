@@ -15,6 +15,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "ImpactIonization.hpp"
 #include "Mobility.hpp"
