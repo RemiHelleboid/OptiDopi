@@ -78,7 +78,7 @@ void Device1D::export_poisson_solution(const std::string& directory_name, const 
     }
     std::filesystem::create_directories(directory_name);
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); idx_voltage += freq_voltage) {
-        const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
+        const std::string filename = fmt::format("{}/{}_{:06.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
         m_list_poisson_solutions[idx_voltage].export_to_file(filename);
     }
 }
@@ -86,7 +86,7 @@ void Device1D::export_poisson_solution(const std::string& directory_name, const 
 void Device1D::export_poisson_solution(const std::string& directory_name, const std::string& prefix) const {
     std::filesystem::create_directories(directory_name);
     for (std::size_t idx_voltage = 0; idx_voltage < m_list_voltages.size(); ++idx_voltage) {
-        const std::string filename = fmt::format("{}/{}{:03.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
+        const std::string filename = fmt::format("{}/{}_{:06.5f}.csv", directory_name, prefix, m_list_voltages[idx_voltage]);
         m_list_poisson_solutions[idx_voltage].export_to_file(filename);
     }
 }

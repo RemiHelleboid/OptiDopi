@@ -97,7 +97,10 @@ class Particle {
         }
     }
 
-    void compute_velocity() { m_drift_velocity = charge_sign() * m_mobility * m_electric_field; }
+    void compute_velocity() { m_drift_velocity = charge_sign() * m_mobility * m_electric_field; 
+    m_drift_velocity.set_y(0.0);
+    m_drift_velocity.set_z(0.0);
+    }
 
     void perform_transport_step(double time_step, Vector3 GaussianReducedCenter, double temperature = 300) {
         constexpr double cm_to_micron = 1e4;
@@ -107,6 +110,8 @@ class Particle {
         m_position +=
             m_drift_velocity * time_step * cm_to_micron + GaussianReducedCenter * particle_diffusion_sqrt * sqrt(time_step) * cm_to_micron;
         m_time += time_step;
+        m_position.set_z(0.0);
+        
     }
 
     void perform_impact_ionization_step(double time_step) {
@@ -118,6 +123,10 @@ class Particle {
             m_local_ionization_coeff = mcintyre::beta_DeMan(m_electric_field.norm() * cm_to_micron, 1.0, 1.12052);
         }
         m_cumulative_impact_ionization += time_step * m_drift_velocity.norm() * m_local_ionization_coeff * 1.0 / cm_to_micron;
+
+        if (m_electric_field.norm() <= 1e5) {
+            m_cumulative_impact_ionization = 0.0;
+        }
     }
 
     bool has_impact_ionized() const {

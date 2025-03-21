@@ -230,20 +230,20 @@ void generate_dataset_simple_spad(std::size_t NbSamples) {
 }
 
 void create_dataset_complex_spad(std::size_t nb_samples) {
-    std::size_t number_points    = 100;
+    std::size_t number_points    = 200;
     double      intrinsic_length = 0.0;
     double      intrinsic_level  = 1e12;
     int         DopSmooth        = 11;
 
-    double min_total_length       = 8.0;
-    double max_total_length       = 8.0;
-    double min_donor_length       = 0.1;
-    double max_donor_length       = 4.0;
+    double min_total_length       = 6.0;
+    double max_total_length       = 6.0;
+    double min_donor_length       = 1.0;
+    double max_donor_length       = 1.0;
     double log_min_donor_level    = std::log10(1.0e16);
-    double log_max_donor_level    = std::log10(1.0e20);
-    double log_min_acceptor_level = std::log10(1.0e16);
-    double log_max_acceptor_level = std::log10(1.0e20);
-    int    NbAcceptors            = 10;
+    double log_max_donor_level    = std::log10(1.0e19);
+    double log_min_acceptor_level = std::log10(1.0e13);
+    double log_max_acceptor_level = std::log10(1.0e19);
+    int    NbAcceptors            = 15;
 
     std::size_t NbPointSamplingDoping = 20;
 
@@ -297,7 +297,8 @@ void create_dataset_complex_spad(std::size_t nb_samples) {
         doping_levels[i]   = my_device.get_doping_profile().get_doping_concentration();
         total_lengths[i]   = total_length;
         donor_lengths[i]   = donor_length;
-        bool run_admc      = true;
+        my_device.export_doping_profile(fmt::format("Profiles/DopingProfile_{}.csv", i));
+        bool run_admc      = false;
         try {
             cost_function_result cost_result =
                 main_function_spad_complex(donor_length, donor_level, total_length, acceptor_x, acceptor_lev, run_admc);

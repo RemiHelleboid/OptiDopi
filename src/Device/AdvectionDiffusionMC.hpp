@@ -146,6 +146,8 @@ class SimulationADMC {
 
     void RunSimulation();
 
+    // std::size_t get_number_of_particles() const { return m_particles.size(); }
+
     std::vector<double> RunTransportSimulationToMaxField();
 
     void RunBULKSimulation(double doping_level, double electric_field);

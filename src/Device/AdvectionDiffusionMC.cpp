@@ -166,10 +166,10 @@ void SimulationADMC::SetBulkData(double doping_level, double electric_field) {
 void SimulationADMC::SetDataFromDeviceStep() {
     // Set doping and electric field
     std::vector<double> x_positions               = this->get_all_x_positions();
-    std::vector<double> InterpolatedDoping        = Utils::interp1dSorted(m_x_line, m_doping, x_positions);
-    std::vector<double> InterpolatedElectricField = Utils::interp1dSorted(m_x_line, m_ElectricField, x_positions);
-    std::vector<double> e_interpolated_div_diff   = Utils::interp1dSorted(m_x_line, m_eDivDiffusion, x_positions);
-    std::vector<double> h_interpolated_div_diff   = Utils::interp1dSorted(m_x_line, m_hDivDiffusion, x_positions);
+    std::vector<double> InterpolatedDoping        = Utils::interp1d(m_x_line, m_doping, x_positions);
+    std::vector<double> InterpolatedElectricField = Utils::interp1d(m_x_line, m_ElectricField, x_positions);
+    std::vector<double> e_interpolated_div_diff   = Utils::interp1d(m_x_line, m_eDivDiffusion, x_positions);
+    std::vector<double> h_interpolated_div_diff   = Utils::interp1d(m_x_line, m_hDivDiffusion, x_positions);
     for (std::size_t idx_part = 0; idx_part < m_particles.size(); ++idx_part) {
         m_particles[idx_part].set_doping(InterpolatedDoping[idx_part]);
         m_particles[idx_part].set_electric_field({InterpolatedElectricField[idx_part], 0.0, 0.0});
@@ -236,7 +236,9 @@ void SimulationADMC::RunSimulation() {
         PerformImpactIonizationStep();
         m_time += m_parameters.m_time_step;
         m_number_steps++;
-        // ExportCurrentState();
+        // if (m_number_steps % 1 == 0) {
+            // ExportCurrentState();
+        // }
     }
     if (m_particles.size() == 0) {
         std::cout << "No more particles, simulation stopped" << std::endl;
@@ -245,7 +247,7 @@ void SimulationADMC::RunSimulation() {
         m_history.m_avalanche_time        = m_time;
         // std::cout << "Avalanche!" << std::endl;
     } else {
-        // std::cout << "Maximum time reached, simulation stopped" << std::endl;
+    //     std::cout << "Maximum time reached, simulation stopped, nb particles: " << m_particles.size() << std::endl;
     }
 }
 
@@ -330,6 +332,7 @@ std::vector<double> SimulationADMC::compute_impact_ionization_coeff() const {
 void SimulationADMC::ExportCurrentState() const {
     std::string   filename = fmt::format("{}State.csv.{:05d}", m_parameters.m_output_file, m_number_steps);
     std::ofstream file(filename);
+    // std::cout << "Exporting current state to " << filename << std::endl;
     // Export for each particle, its position, its velocity, and its type
     file << "X,Y,Z,Vx,Vy,Vz,Type,CumulativeIonizationCoeff\n";
     for (const auto& particle : m_particles) {
@@ -369,6 +372,7 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
     std::vector<double> eBreakdownRatio(x_line.size(), 0.0);
 
     std::size_t nb_avalanches = 0;
+#pragma omp parallel for schedule(dynamic) reduction(+ : nb_avalanches)
     for (std::size_t idx_x = 0; idx_x < x_line.size(); ++idx_x) {
         // std::cout << "Running simulation on point " << x_line[idx_x] << std::endl;
         std::vector<double> avalanche_times_point;
@@ -387,6 +391,8 @@ void MainFullADMCSimulation(const ParametersADMC& parameters,
         }
         double ratio           = static_cast<double>(nb_avalanches_point) / static_cast<double>(nb_simulation_per_points);
         eBreakdownRatio[idx_x] = ratio;
+        std::cout << "Breakdown ratio at point (" << idx_x << "/" << x_line.size() << " -> " << x_line[idx_x] << ": " << ratio << std::endl;
+        
         // Add the avalanche times to the global vector
         { all_avalanche_times.insert(all_avalanche_times.end(), avalanche_times_point.begin(), avalanche_times_point.end()); }
     }

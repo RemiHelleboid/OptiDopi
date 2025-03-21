@@ -12,6 +12,7 @@
 
 #include "fmt/format.h"
 #include "fmt/ostream.h"
+#include "fmt/ranges.h"
 
 struct SimulatedAnnealHistory {
     std::vector<std::vector<double>> solutions;

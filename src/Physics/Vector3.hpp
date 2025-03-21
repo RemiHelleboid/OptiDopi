@@ -34,6 +34,10 @@ public:
     double y() const { return m_y; }
     double z() const { return m_z; }
 
+    void set_x(double x) { m_x = x; }
+    void set_y(double y) { m_y = y; }
+    void set_z(double z) { m_z = z; }
+
     double norm() const { return std::sqrt(m_x * m_x + m_y * m_y + m_z * m_z); }
 
     Vector3& operator+=(const Vector3& other) {

@@ -77,8 +77,8 @@ void doping_profile::set_up_pin_diode(double      x_min,
             m_donor_concentration[index_x]    = donor_level;
             m_acceptor_concentration[index_x] = 0.0;
         } else if (x_position <= length_donor + length_intrinsic) {
-            m_donor_concentration[index_x]    = intrinsic_level;
-            m_acceptor_concentration[index_x] = 0.0;
+            m_donor_concentration[index_x]    = 0.0;
+            m_acceptor_concentration[index_x] = intrinsic_level;
         } else {
             m_donor_concentration[index_x]    = 0.0;
             m_acceptor_concentration[index_x] = acceptor_level;
@@ -88,7 +88,9 @@ void doping_profile::set_up_pin_diode(double      x_min,
 }
 
 void doping_profile::load_doping_profile(const std::string& filename) {
+    std::cout << "Loading doping profile from file: " << filename << std::endl;
     std::ifstream file(filename);
+    std::cout << "File opened" << std::endl;
     if (!file.is_open()) {
         throw std::logic_error("Error: Cannot open file " + filename + " for reading.");
     }
@@ -107,9 +109,10 @@ void doping_profile::load_doping_profile(const std::string& filename) {
     m_acceptor_concentration.resize(number_points);
     for (std::size_t index_x = 0; index_x < number_points; ++index_x) {
         std::getline(file, line);
+        std::replace(line.begin(), line.end(), ',', ' ');
         std::istringstream iss(line);
-        double              x_position, donor_concentration, acceptor_concentration;
-        if (!(iss >> x_position >> donor_concentration >> acceptor_concentration)) {
+        double              x_position, donor_concentration, acceptor_concentration, net;
+        if (!(iss >> x_position >> donor_concentration >> acceptor_concentration >> net)) {
             throw std::runtime_error("Error reading file");
         }
         m_x_line[index_x]                 = x_position;

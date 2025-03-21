@@ -71,6 +71,8 @@ endif()
 message("Optimization for the local machine is enabled")
 # add_compile_options(-march=native)
 
+# Add external/include to the include path
+include_directories(external/include)
 
 find_package(Eigen3 NO_MODULE)
 
