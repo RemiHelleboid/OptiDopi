@@ -17,36 +17,37 @@ INOUE_BIN="/home/remi/DEV/OptiDopi/build/apps/quencher.x"
 
 # Command : ./apps/quencher.x --num_simulations 1000 -p --C 30e-15 --R 12e3 --V_ex=0.5
 
-def run_inoue_sweep_C(minC, maxC, Nsteps, R, Vex, Nsimu_per_C):
+def run_inoue_sweep_C(minC, maxC, Nsteps, R, Vex, Nsimu_per_C, nthreads):
     """Run Inoue sweep for capacitance.
     Run the process for different values of capacitance and wait for the process to finish.
     """
     C_values = np.linspace(minC, maxC, Nsteps)
     for C in C_values:
         print(f"Running Inoue for C={C}")
-        subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_C), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex)])
+        subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_C), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex), "--j", str(nthreads)])
         print(f"Done for C={C}")
         time.sleep(1)
 
-def run_inoue_sweep_R(minR, maxR, Nsteps, C, Vex, Nsimu_per_R):
+def run_inoue_sweep_R(minR, maxR, Nsteps, C, Vex, Nsimu_per_R, nthreads):
     """Run Inoue sweep for resistance.
     Run the process for different values of resistance and wait for the process to finish.
     """
     R_values = np.linspace(minR, maxR, Nsteps)
     for R in R_values:
         print(f"Running Inoue for R={R}")
-        subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_R), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex)])
+        s = subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_R), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex), "--j", str(nthreads)])
+        print(s) 
         print(f"Done for R={R}")
         time.sleep(1)
 
-def run_inoue_sweep_Vex(minVex, maxVex, Nsteps, C, R, Nsimu_per_Vex):
+def run_inoue_sweep_Vex(minVex, maxVex, Nsteps, C, R, Nsimu_per_Vex, nthreads):
     """Run Inoue sweep for external voltage.
     Run the process for different values of external voltage and wait for the process to finish.
     """
     Vex_values = np.linspace(minVex, maxVex, Nsteps)
     for Vex in Vex_values:
         print(f"Running Inoue for Vex={Vex}")
-        subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_Vex), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex)])
+        subprocess.run([INOUE_BIN, "--num_simulations", str(Nsimu_per_Vex), "-p", "--C", str(C), "--R", str(R), "--V_ex", str(Vex), "--j", str(nthreads)])
         print(f"Done for Vex={Vex}")
         time.sleep(1)
 
@@ -134,6 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("--Nsimu_per_C", type=int, help="Number of simulations per capacitance value")
     parser.add_argument("--Nsimu_per_R", type=int, help="Number of simulations per resistance value")
     parser.add_argument("--Nsimu_per_Vex", type=int, help="Number of simulations per external voltage value")
+    parser.add_argument("--j", type=int, help="Number of threads")
     # Arg P to only plot the results
     parser.add_argument("-P", action="store_true", help="Plot the results")
     args = parser.parse_args()
@@ -141,14 +143,13 @@ if __name__ == "__main__":
     if args.P:
         plot_results(".")
         sys.exit(0)
-    if args.C is not None:
-        run_inoue_sweep_C(args.C, args.C, 1, args.R, args.Vex, 1)
     if args.minC is not None:
-        run_inoue_sweep_C(args.minC, args.maxC, args.NstepsC, args.R, args.Vex, args.Nsimu_per_C)
+        run_inoue_sweep_C(args.minC, args.maxC, args.NstepsC, args.R, args.Vex, args.Nsimu_per_C, args.j)
     if args.minR is not None:
-        run_inoue_sweep_R(args.minR, args.maxR, args.NstepsR, args.C, args.Vex, args.Nsimu_per_R)
+        run_inoue_sweep_R(args.minR, args.maxR, args.NstepsR, args.C, args.Vex, args.Nsimu_per_R, args.j)
     if args.minVex is not None:
-        run_inoue_sweep_Vex(args.minVex, args.maxVex, args.NstepsVex, args.C, args.R, args.Nsimu_per_Vex)
+        run_inoue_sweep_Vex(args.minVex, args.maxVex, args.NstepsVex, args.C, args.R, args.Nsimu_per_Vex, args.j)
+    plot_results(".")
 
         
 

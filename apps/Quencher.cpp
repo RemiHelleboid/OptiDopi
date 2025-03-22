@@ -272,6 +272,7 @@ int main(int argc, char* argv[]) {
     parser.add_argument("--eta").default_value(3.0).help("Bias parameter for electron generation locations").scan<'g', double>();
     parser.add_argument("--dt").default_value(0.2e-12).help("Time step (s)").scan<'g', double>();
     parser.add_argument("--num_steps").default_value(50000).help("Number of time steps").scan<'i', int>();
+    parser.add_argument("--j").default_value(1).help("Nb thread").scan<'i', int>();
     parser.add_argument("--output_dir").default_value("simulation_results").help("Output directory name");
     parser.add_argument("--num_simulations").default_value(1).help("Number of simulations to run").scan<'i', int>();
     parser.add_argument("--k_sc").default_value(5e11).help("Space charge proportionality constant (V·cm/C)").scan<'g', double>();
@@ -304,6 +305,7 @@ int main(int argc, char* argv[]) {
         const double eta       = parser.get<double>("--eta");
         const double dt        = parser.get<double>("--dt");
         const int    num_steps = parser.get<int>("--num_steps");
+        const int    nb_thread = parser.get<int>("--j");
         double       k_sc      = parser.get<double>("--k_sc");
         k_sc                   = 0.0;
 
@@ -318,7 +320,7 @@ int main(int argc, char* argv[]) {
         int              nb_succesufull_quenching = 0;
         std::atomic<int> progressCounter{0};
 
-#pragma omp parallel for num_threads(8) reduction(+ : nb_avalanche) reduction(+ : nb_succesufull_quenching)
+#pragma omp parallel for num_threads(nb_thread) reduction(+ : nb_avalanche) reduction(+ : nb_succesufull_quenching)
         for (int i = 0; i < numSimulations; ++i) {
             const std::string outputFile = outputDir + "/simulation_" + std::to_string(i + 1) + ".csv";
             SPAD              spad(q, v_e, v_h, W, V_BD, V_ex, C, R, alpha_0, beta_0, alpha_p, beta_p, eta, dt, num_steps, k_sc);
