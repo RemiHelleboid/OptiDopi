@@ -1,6 +1,13 @@
+#include <fmt/chrono.h>
+#include <fmt/core.h>
+#include <fmt/format.h>
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
+#include <fmt/xchar.h>
 #include <omp.h>  // For OpenMP
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <filesystem>  // For directory creation
 #include <fstream>
@@ -13,43 +20,46 @@
 
 namespace fs = std::filesystem;  // Alias for filesystem
 
-// Random number generator
-std::random_device               rd;
-std::mt19937                     gen(rd());
-std::uniform_real_distribution<> dis(0.0, 1.0);
-
 // SPAD class with space charge effect
 class SPAD {
  private:
     // Physical constants (configurable at runtime)
-    double q;        // Electron charge (C)
-    double v_e;      // Saturation velocity of electrons (cm/s)
-    double v_h;      // Saturation velocity of holes (cm/s)
-    double W;        // Width of the multiplication region (cm)
-    double V_BD;     // Breakdown voltage (V)
-    double V_ex;     // Excess voltage (V)
-    double C;        // Capacitance (F)
-    double R;        // Quenching resistance (Ohms)
-    double alpha_0;  // Impact ionization coefficient for electrons (cm^-1)
-    double beta_0;   // Impact ionization coefficient for holes (cm^-1)
-    double alpha_p;  // Impact ionization coefficient for electrons (cm^-1)
-    double beta_p;   // Impact ionization coefficient for holes (cm^-1)
-    double eta;      // Bias parameter for electron generation locations
-    double k_sc;     // Space charge proportionality constant (V·cm/C)
+    double m_q;        // Electron charge (C)
+    double m_v_e;      // Saturation velocity of electrons (cm/s)
+    double m_v_h;      // Saturation velocity of holes (cm/s)
+    double m_W;        // Width of the multiplication region (cm)
+    double m_V_BD;     // Breakdown voltage (V)
+    double m_V_ex;     // Excess voltage (V)
+    double m_C;        // Capacitance (F)
+    double m_R;        // Quenching resistance (Ohms)
+    double m_alpha_0;  // Impact ionization coefficient for electrons (cm^-1)
+    double m_beta_0;   // Impact ionization coefficient for holes (cm^-1)
+    double m_alpha_p;  // Impact ionization coefficient for electrons (cm^-1)
+    double m_beta_p;   // Impact ionization coefficient for holes (cm^-1)
+    double m_eta;      // Bias parameter for electron generation locations
+    double m_k_sc;     // Space charge proportionality constant (V·cm/C)
 
     // Simulation parameters (configurable at runtime)
-    double dt;         // Time step (s)
-    int    num_steps;  // Number of time steps
+    double      m_dt;         // Time step (s)
+    std::size_t m_num_steps;  // Number of time steps
 
     // Internal state
-    std::vector<double> electrons;  // Positions of electrons in the MR (cm)
-    std::vector<double> holes;      // Positions of holes in the MR (cm)
-    double              N_e;        // Number of electrons accumulated at the cathode node
-    double              V;          // Voltage across the MR (V)
-    double              E;          // Electric field in the MR (V/cm)
+    std::vector<double> m_electrons;  // Positions of electrons in the MR (cm)
+    std::vector<double> m_holes;      // Positions of holes in the MR (cm)
+    double              m_N_e;        // Number of electrons accumulated at the cathode node
+    double              m_V;          // Voltage across the MR (V)
+    double              m_E;          // Electric field in the MR (V/cm)
+
+    // Random number generation (each instance has its own engine)
+    std::mt19937                           m_rng;
+    std::uniform_real_distribution<double> m_dist{0.0, 1.0};
+
+    // Results
+    bool m_avalanche             = false;
+    bool m_succesufull_quenching = false;
 
  public:
-    // Constructor with configurable parameters, including k_sc for space charge effect
+    // Constructor with configurable parameters, including m_k_sc for space charge effect
     SPAD(double q,
          double v_e,
          double v_h,
@@ -62,173 +72,183 @@ class SPAD {
          double beta_0,
          double alpha_p,
          double beta_p,
-         double eta,
+         double eta,  // Parameter name remains unchanged
          double dt,
          int    num_steps,
          double k_sc)
-        : q(q),
-          v_e(v_e),
-          v_h(v_h),
-          W(W),
-          V_BD(V_BD),
-          V_ex(V_ex),
-          C(C),
-          R(R),
-          alpha_0(alpha_0),
-          beta_0(beta_0),
-          alpha_p(alpha_p),
-          beta_p(beta_p),
-          eta(eta),
-          dt(dt),
-          num_steps(num_steps),
-          k_sc(k_sc),
-          electrons({W / 2}),
-          holes({W / 2}),
-          N_e(0),
-          V(V_BD + V_ex),
-          E(V / W) {
+        : m_q(q),
+          m_v_e(v_e),
+          m_v_h(v_h),
+          m_W(W),
+          m_V_BD(V_BD),
+          m_V_ex(V_ex),
+          m_C(C),
+          m_R(R),
+          m_alpha_0(alpha_0),
+          m_beta_0(beta_0),
+          m_alpha_p(alpha_p),
+          m_beta_p(beta_p),
+          m_eta(eta),  // Initialize renamed member variable using parameter "eta"
+          m_k_sc(k_sc),
+          m_dt(dt),
+          m_num_steps(static_cast<std::size_t>(num_steps)),
+          m_electrons({W / 2}),
+          m_holes({W / 2}),
+          m_N_e(0),
+          m_V(V_BD + V_ex),
+          m_E((V_BD + V_ex) / W),
+          m_rng(std::random_device{}()) {
         // Validate parameters
-        if (W <= 0) throw std::invalid_argument("Width of the multiplication region (W) must be positive.");
+        if (W <= 0) throw std::invalid_argument("Width (W) must be positive.");
         if (dt <= 0) throw std::invalid_argument("Time step (dt) must be positive.");
-        if (num_steps <= 0) throw std::invalid_argument("Number of time steps (num_steps) must be positive.");
+        if (num_steps <= 0) throw std::invalid_argument("Number of time steps must be positive.");
         if (V_ex < 0) throw std::invalid_argument("Excess voltage (V_ex) must be non-negative.");
     }
 
-    // Function to calculate impact ionization rates
-    std::pair<double, double> calculate_impact_ionization_rates(double E) const {
-        double alpha = alpha_0 * std::exp(-alpha_p / E);  // Electron impact ionization rate
-        double beta  = beta_0 * std::exp(-beta_p / E);    // Hole impact ionization rate
+    bool hasAvalanche() const { return m_avalanche; }
+    bool hasSuccesufullQuenching() const { return m_succesufull_quenching; }
+
+    // Calculate impact ionization rates based on the effective electric field
+    std::pair<double, double> calculateImpactIonizationRates(double E) const {
+        double alpha = m_alpha_0 * std::exp(-m_alpha_p / E);
+        double beta  = m_beta_0 * std::exp(-m_beta_p / E);
         return {alpha, beta};
     }
 
-    // Function to simulate impact ionization
-    std::vector<double> simulate_impact_ionization(const std::vector<double>& carriers, double ionization_rate, double velocity) const {
-        std::vector<double> new_carriers;
-        for (double pos : carriers) {
-            if (dis(gen) < ionization_rate * velocity * dt) {
-                new_carriers.push_back(pos);  // New carrier generated at the same position
+    // Simulate impact ionization for a given carrier type.
+    // (New carriers are generated at the same positions as their parent carriers.)
+    std::vector<double> simulateImpactIonization(const std::vector<double>& carriers, double ionizationRate, double velocity) {
+        std::vector<double> newCarriers;
+        for (const auto pos : carriers) {
+            if (m_dist(m_rng) < ionizationRate * velocity * m_dt) {
+                newCarriers.push_back(pos);
             }
         }
-        return new_carriers;
+        return newCarriers;
     }
 
-    // Function to update carrier positions
-    void update_carrier_positions(std::vector<double>& carriers, double velocity) {
-        for (double& pos : carriers) {
-            pos += velocity * dt;  // Update position based on velocity
+    // Update carrier positions based on their velocity.
+    void updateCarrierPositions(std::vector<double>& carriers, double velocity) {
+        for (auto& pos : carriers) {
+            pos += velocity * m_dt;
         }
     }
 
-    // Function to remove carriers that have drifted out of the MR
-    void remove_drifted_carriers(std::vector<double>& carriers, const std::function<bool(double)>& boundary_condition) {
-        carriers.erase(std::remove_if(carriers.begin(), carriers.end(), boundary_condition), carriers.end());
+    // Remove carriers that have drifted outside the multiplication region.
+    void removeDriftedCarriers(std::vector<double>& carriers, const std::function<bool(double)>& isOutOfBounds) {
+        carriers.erase(std::remove_if(carriers.begin(), carriers.end(), isOutOfBounds), carriers.end());
     }
 
-    // Function to simulate one time step with space charge effect
-    void simulate_time_step() {
+    // Simulate one time step with space charge effect.
+    void simulateTimeStep() {
         // Update voltage based on accumulated electrons at the cathode
-        V = (V_BD + V_ex) - (q / C) * N_e;
+        m_V = (m_V_BD + m_V_ex) - (m_q / m_C) * m_N_e;
 
-        // Compute the total number of carriers in the MR and the corresponding charge density
-        double total_carriers = electrons.size() + holes.size();
-        double rho            = q * total_carriers / W;  // Charge density (C/cm)
+        // Compute charge density in the MR and the voltage drop due to space charge
+        const double totalCarriers = m_electrons.size() + m_holes.size();
+        const double rho           = m_q * totalCarriers / m_W;  // Charge density (C/cm)
+        const double deltaV_sc     = m_k_sc * rho;
+        const double V_eff         = std::max(m_V - deltaV_sc, 0.0);
+        m_E                        = V_eff / m_W;
 
-        // Compute a voltage drop due to space charge
-        double deltaV_sc = k_sc * rho;
-        std::cout << "Space charge voltage drop: " << deltaV_sc << " V for N_e = " << N_e << "\n";
-        double V_eff = V - deltaV_sc;  // Effective voltage across MR after space charge drop
-        if (V_eff < 0) V_eff = 0;      // Avoid negative effective voltage
-
-        // Update effective electric field
-        E = V_eff / W;  // Effective electric field in the MR
-
-        // Calculate impact ionization rates based on the effective electric field
-        auto [alpha, beta] = calculate_impact_ionization_rates(E);
+        // Get impact ionization rates based on the effective electric field
+        const auto [alpha, beta] = calculateImpactIonizationRates(m_E);
 
         // Simulate impact ionization for electrons
-        auto new_electrons = simulate_impact_ionization(electrons, alpha, v_e);
-        auto new_holes     = new_electrons;  // New holes generated at the same positions as electrons
-        electrons.insert(electrons.end(), new_electrons.begin(), new_electrons.end());
-        holes.insert(holes.end(), new_holes.begin(), new_holes.end());
+        const auto newElectrons = simulateImpactIonization(m_electrons, alpha, m_v_e);
+        // New holes are generated at the same positions as the newly created electrons
+        const auto newHolesFromElectrons = newElectrons;
+        m_electrons.insert(m_electrons.end(), newElectrons.begin(), newElectrons.end());
+        m_holes.insert(m_holes.end(), newHolesFromElectrons.begin(), newHolesFromElectrons.end());
 
         // Simulate impact ionization for holes
-        auto new_electrons_from_holes = simulate_impact_ionization(holes, beta, v_h);
-        auto new_holes_from_holes     = new_electrons_from_holes;  // New holes generated at the same positions as electrons from holes
-        electrons.insert(electrons.end(), new_electrons_from_holes.begin(), new_electrons_from_holes.end());
-        holes.insert(holes.end(), new_holes_from_holes.begin(), new_holes_from_holes.end());
+        const auto newElectronsFromHoles = simulateImpactIonization(m_holes, beta, m_v_h);
+        const auto newHolesFromHoles     = newElectronsFromHoles;
+        m_electrons.insert(m_electrons.end(), newElectronsFromHoles.begin(), newElectronsFromHoles.end());
+        m_holes.insert(m_holes.end(), newHolesFromHoles.begin(), newHolesFromHoles.end());
 
         // Update positions of electrons and holes
-        update_carrier_positions(electrons, v_e);
-        update_carrier_positions(holes, -v_h);
+        updateCarrierPositions(m_electrons, m_v_e);
+        updateCarrierPositions(m_holes, -m_v_h);
 
         // Remove electrons that have drifted out of the MR
-        auto   drifted_electrons = [this](double pos) { return pos >= W; };
-        double delta_n_e         = std::count_if(electrons.begin(), electrons.end(), drifted_electrons);
-        remove_drifted_carriers(electrons, drifted_electrons);
-        N_e += delta_n_e;  // Accumulate electrons at the cathode node
+        const auto   isDriftedElectron    = [this](double pos) { return pos >= m_W; };
+        const double driftedElectronCount = std::count_if(m_electrons.begin(), m_electrons.end(), isDriftedElectron);
+        removeDriftedCarriers(m_electrons, isDriftedElectron);
+        m_N_e += driftedElectronCount;  // Accumulate electrons at the cathode
 
         // Remove holes that have drifted out of the MR
-        auto drifted_holes = [](double pos) { return pos < 0; };
-        remove_drifted_carriers(holes, drifted_holes);
+        const auto isDriftedHole = [](double pos) { return pos < 0; };
+        removeDriftedCarriers(m_holes, isDriftedHole);
 
         // Discharge electrons through the quenching resistor
-        N_e -= N_e * dt / (R * C);
+        m_N_e -= m_N_e * m_dt / (m_R * m_C);
     }
 
-    // Function to run the full simulation
-    void run_simulation(const std::string& output_file) {
-        // Arrays to store results
-        std::vector<double> voltage_history(num_steps);
-        std::vector<double> electron_count_history(num_steps);
-        std::vector<double> electric_field_history(num_steps);
-        std::size_t MAX_NB_ELECTRONS = 10e6;  // Maximum number of electrons in the MR
-        // Run simulation loop
-        for (int i = 0; i < num_steps; ++i) {
-            simulate_time_step();
-            voltage_history[i]        = V;
-            electron_count_history[i] = electrons.size();
-            electric_field_history[i] = E;
+    // Run the full simulation and write results to a CSV file.
+    void runSimulation(const std::string& outputFile) {
+        std::vector<double> voltageHistory(m_num_steps);
+        std::vector<double> electronCountHistory(m_num_steps);
+        std::vector<double> electricFieldHistory(m_num_steps);
+        const std::size_t   MAX_NB_ELECTRONS = 10e6;  // Threshold for stopping simulation
 
-            if (N_e > MAX_NB_ELECTRONS) {
-                std::cout << "Simulation stopped: Maximum number of electrons in MR exceeded the threshold.\n";
-                // Resize arrays to the current step
-                voltage_history.resize(i + 1);
-                electron_count_history.resize(i + 1);
-                electric_field_history.resize(i + 1);
+        double       Vbias               = m_V_BD + m_V_ex;
+        const double RATIO_QUECH_SUCCESS = 0.999;
+
+        for (std::size_t step = 0; step < m_num_steps; ++step) {
+            simulateTimeStep();
+            voltageHistory[step]       = m_V;
+            electronCountHistory[step] = m_electrons.size();
+            electricFieldHistory[step] = m_E;
+
+            if (m_N_e > MAX_NB_ELECTRONS) {
+                fmt::print("Simulation stopped: Maximum number of electrons in MR exceeded the threshold.\n");
+                voltageHistory.resize(step + 1);
+                electronCountHistory.resize(step + 1);
+                electricFieldHistory.resize(step + 1);
+                break;
+            }
+            // Check for avalanche
+            if (!m_avalanche && (Vbias - m_V) >= 0.95 * m_V_ex) {
+                m_avalanche = true;
+            }
+            if (!m_avalanche && step >= static_cast<std::size_t>(m_num_steps * 0.1)) {
+                voltageHistory.resize(step + 1);
+                electronCountHistory.resize(step + 1);
+                electricFieldHistory.resize(step + 1);
+                break;
+            }
+            // Check for quenching success (voltage back to V_BD)
+            if (m_avalanche && m_V >= RATIO_QUECH_SUCCESS * Vbias) {
+                m_succesufull_quenching = true;
+                voltageHistory.resize(step + 1);
+                electronCountHistory.resize(step + 1);
+                electricFieldHistory.resize(step + 1);
                 break;
             }
         }
 
-        // Check if the maximum number of electrons exceeds the threshold
-        std::size_t max_nb_electrons = *std::max_element(electron_count_history.begin(), electron_count_history.end());
-        if (max_nb_electrons < 100) {
-            std::cout << "Simulation skipped: Maximum number of electrons in MR (" << max_nb_electrons << ") is below the threshold.\n";
-            return;
-        }
-
         // Write results to a CSV file
-        std::ofstream out_file(output_file);
-        if (!out_file) {
-            throw std::runtime_error("Failed to open output file: " + output_file);
+        std::ofstream outFile(outputFile);
+        if (!outFile) {
+            throw std::runtime_error("Failed to open output file: " + outputFile);
         }
 
-        num_steps = voltage_history.size();  // Update the number of steps based on the actual size
-        out_file << "time,voltage,electron_count,electric_field\n";
-        for (int i = 0; i < num_steps; ++i) {
-            out_file << i * dt << "," << voltage_history[i] << "," << electron_count_history[i] << "," << electric_field_history[i];
-            out_file << "\n";
+        outFile << "time,voltage,electron_count,electric_field\n";
+        for (std::size_t i = 0; i < voltageHistory.size(); ++i) {
+            outFile << i * m_dt << "," << voltageHistory[i] << "," << electronCountHistory[i] << "," << electricFieldHistory[i] << "\n";
         }
-        out_file.close();
+        outFile.close();
 
-        std::cout << "Max number of electrons in MR: " << max_nb_electrons << "\n";
+        // fmt::print("Max number of electrons in MR: {}\n", maxElectronCount);
     }
 };
 
 // Function to create a directory if it doesn't exist
-void create_directory(const std::string& dir_name) {
-    if (!fs::exists(dir_name)) {
-        fs::create_directory(dir_name);
-        std::cout << "Created directory: " << dir_name << "\n";
+void createDirectory(const std::string& dirName) {
+    if (!fs::exists(dirName)) {
+        fs::create_directory(dirName);
+        fmt::print("Created directory: {}\n", dirName);
     }
 }
 
@@ -236,7 +256,7 @@ int main(int argc, char* argv[]) {
     // Parse command-line arguments
     argparse::ArgumentParser parser("SPAD Simulation");
 
-    // Add arguments for all configurable parameters, including k_sc for space charge effect
+    // Add arguments for all configurable parameters, including m_k_sc for space charge effect
     parser.add_argument("--q").default_value(1.6e-19).help("Electron charge (C)").scan<'g', double>();
     parser.add_argument("--v_e").default_value(1.02e7).help("Saturation velocity of electrons (cm/s)").scan<'g', double>();
     parser.add_argument("--v_h").default_value(8.31e6).help("Saturation velocity of holes (cm/s)").scan<'g', double>();
@@ -255,6 +275,8 @@ int main(int argc, char* argv[]) {
     parser.add_argument("--output_dir").default_value("simulation_results").help("Output directory name");
     parser.add_argument("--num_simulations").default_value(1).help("Number of simulations to run").scan<'i', int>();
     parser.add_argument("--k_sc").default_value(5e11).help("Space charge proportionality constant (V·cm/C)").scan<'g', double>();
+    // Add argument to plot or not the results (plot if the argument is present)
+    parser.add_argument("-p", "--plot").default_value(false).implicit_value(true).help("Plot the results using Python");
 
     try {
         parser.parse_args(argc, argv);
@@ -264,39 +286,113 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // Create output directory
-        std::string output_dir = parser.get<std::string>("--output_dir");
-        create_directory(output_dir);
+        // Extract simulation parameters from command line
+        const std::string baseOutputDir = parser.get<std::string>("--output_dir");
 
-        // Run multiple simulations
-        int num_simulations = parser.get<int>("--num_simulations");
-        // #pragma omp parallel for
-        for (int i = 0; i < num_simulations; ++i) {
-            std::string output_file = output_dir + "/simulation_" + std::to_string(i + 1) + ".csv";
+        const double q         = parser.get<double>("--q");
+        const double v_e       = parser.get<double>("--v_e");
+        const double v_h       = parser.get<double>("--v_h");
+        const double W         = parser.get<double>("--W");
+        const double V_BD      = parser.get<double>("--V_BD");
+        const double V_ex      = parser.get<double>("--V_ex");
+        const double C         = parser.get<double>("--C");
+        const double R         = parser.get<double>("--R");
+        const double alpha_0   = parser.get<double>("--alpha_0");
+        const double beta_0    = parser.get<double>("--beta_0");
+        const double alpha_p   = parser.get<double>("--alpha_p");
+        const double beta_p    = parser.get<double>("--beta_p");
+        const double eta       = parser.get<double>("--eta");
+        const double dt        = parser.get<double>("--dt");
+        const int    num_steps = parser.get<int>("--num_steps");
+        double       k_sc      = parser.get<double>("--k_sc");
+        k_sc                   = 0.0;
 
-            // Create SPAD object with configurable parameters, including k_sc
-            SPAD spad(parser.get<double>("--q"),
-                      parser.get<double>("--v_e"),
-                      parser.get<double>("--v_h"),
-                      parser.get<double>("--W"),
-                      parser.get<double>("--V_BD"),
-                      parser.get<double>("--V_ex"),
-                      parser.get<double>("--C"),
-                      parser.get<double>("--R"),
-                      parser.get<double>("--alpha_0"),
-                      parser.get<double>("--beta_0"),
-                      parser.get<double>("--alpha_p"),
-                      parser.get<double>("--beta_p"),
-                      parser.get<double>("--eta"),
-                      parser.get<double>("--dt"),
-                      parser.get<int>("--num_steps"),
-                      parser.get<double>("--k_sc"));
+        // Format the output directory name using fmt::format for clarity.
+        std::string outputDir = fmt::format("{}_C_{:.2e}_R_{:.2e}_Vex_{:.2f}_VB_{:.2f}_W_{:.2e}", baseOutputDir, C, R, V_ex, V_BD, W);
+        createDirectory(outputDir);
 
-            // Run simulation
-            std::cout << "Starting simulation " << i + 1 << " of " << num_simulations << "...\n";
-            spad.run_simulation(output_file);
-            std::cout << "Simulation " << i + 1 << " completed. Results saved to '" << output_file << "'.\n";
+        // Run simulations (can be parallelized with OpenMP if desired)
+        const int numSimulations = parser.get<int>("--num_simulations");
+
+        int              nb_avalanche             = 0;
+        int              nb_succesufull_quenching = 0;
+        std::atomic<int> progressCounter{0};
+
+#pragma omp parallel for num_threads(8) reduction(+ : nb_avalanche) reduction(+ : nb_succesufull_quenching)
+        for (int i = 0; i < numSimulations; ++i) {
+            const std::string outputFile = outputDir + "/simulation_" + std::to_string(i + 1) + ".csv";
+            SPAD              spad(q, v_e, v_h, W, V_BD, V_ex, C, R, alpha_0, beta_0, alpha_p, beta_p, eta, dt, num_steps, k_sc);
+            spad.runSimulation(outputFile);
+            nb_avalanche += spad.hasAvalanche();
+
+            if (spad.hasAvalanche()) {
+                nb_succesufull_quenching += spad.hasSuccesufullQuenching();
+            }
+            // Atomically update the progress counter
+            int currentProgress = progressCounter.fetch_add(1) + 1;
+
+            // Print progress every 10 iterations or at the end
+            if (currentProgress % 10 == 0 || currentProgress == numSimulations) {
+#pragma omp critical
+                {
+                    fmt::print("\rProgress: {}/{} simulations completed.", currentProgress, numSimulations);
+                    std::cout << std::flush;
+                }
+            }
         }
+
+        double proba_avalanche = static_cast<double>(nb_avalanche) / numSimulations;
+        double proba_quenching = static_cast<double>(nb_succesufull_quenching) / nb_avalanche;
+
+        std::cout << "\n\n";
+
+        double RC_ns = R * C * 1e9;  // Time constant in ns
+        fmt::print("C = {:.2e}, R = {:.2e}, RC = {:.2f} ns, V_bias = {} V, W = {:.2e} cm\n", C, R, RC_ns, V_BD + V_ex, W);
+        fmt::print("Results saved in directory: {}\n", outputDir);
+
+        fmt::print("Probability of avalanche: {:.2f}\n", proba_avalanche);
+        fmt::print("Probability of succesufull quenching: {:.2f} ({}/{})\n", proba_quenching, nb_succesufull_quenching, nb_avalanche);
+
+        // Save global results to a file
+        std::string   globalResultsFile = outputDir + "/global_results.txt";
+        std::ofstream outFile(globalResultsFile);
+        if (!outFile) {
+            throw std::runtime_error("Failed to open output file: " + globalResultsFile);
+        }
+        // outFile << "C (F) = " << C << "\n";
+        // outFile << "R (Ohms) = " << R << "\n";
+        // outFile << "RC (ns) = " << RC_ns << "\n";
+        // outFile << "V_bias (V) = " << V_BD + V_ex << "\n";
+        // outFile << "W (cm) = " << W << "\n";
+        // outFile << "Probability of avalanche = " << proba_avalanche << "\n";
+        // outFile << "Probability of succesufull quenching = " << proba_quenching << "\n";
+        // outFile.close();
+        std::string globalResults = fmt::format(
+            "C (F) = {:.5e}\nR (Ohms) = {:.5e}\nRC (ns) = {:.2f}\nV_bias (V) = {}\nW (cm) = {:.2e}\nProbability of avalanche = {:.2f}\nProbability "
+            "of succesufull quenching = {:.2f}\n",
+            C,
+            R,
+            RC_ns,
+            V_BD + V_ex,
+            W,
+            proba_avalanche,
+            proba_quenching);
+        outFile << globalResults;
+        outFile.close();
+
+        std::cout << "\n -------------------------------- \n";
+
+        if (parser["--plot"] == true) {
+            // Run python script to plot the results
+            std::string pythonScriptFile = std::string(CMAKE_SOURCE_DIR) + "/python/plot_quencher.py";
+            std::string command          = fmt::format("python {} {}", pythonScriptFile, outputDir);
+            fmt::print("Running command: {}\n", command);
+            int status = std::system(command.c_str());
+            if (status != 0) {
+                fmt::print("Failed to run the Python script.\n");
+            }
+        }
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 1;

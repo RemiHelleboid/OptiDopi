@@ -68,6 +68,8 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
 endif()
 
+add_compile_definitions(CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 message("Optimization for the local machine is enabled")
 # add_compile_options(-march=native)
 
