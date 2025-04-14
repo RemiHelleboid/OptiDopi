@@ -36,11 +36,39 @@ def plot_quencher(dirname):
 
     fig.tight_layout()
     fig.savefig(f"{dirname}/quencher.png")
-    # plt.show()
+    plt.show()
+
+def quench_time_distrib(dirname):
+    file = f"{dirname}/global_results.txt"
+    line_number_quench_times = 0
+    with open(file, 'r') as f:
+        for i, line in enumerate(f):
+            if "Quenching times (s):" in line:
+                line_number_quench_times = i
+                break
+    quench_times = []
+    with open(file, 'r') as f:
+        for i, line in enumerate(f):
+            if i > line_number_quench_times:
+                quench_times.append(float(line.split()[0]))
+    quench_times = np.array(quench_times)
+    return quench_times
+
+def plot_quench_time_distrib(dirname):
+    quench_times = quench_time_distrib(dirname)
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.hist(quench_times, bins=20, density=True)
+    ax.set_xlabel('Quenching time (s)')
+    ax.set_ylabel('Density')
+    fig.tight_layout()
+    fig.savefig(f"{dirname}/quenching_time_distribution.png")
+    plt.show()
+
 
 if __name__ == "__main__":
     dirname = sys.argv[1]
     plot_quencher(dirname)
+    plot_quench_time_distrib(dirname)
 
 
 

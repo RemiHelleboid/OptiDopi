@@ -20,6 +20,8 @@
 
 namespace fs = std::filesystem;  // Alias for filesystem
 
+#pragma omp declare reduction(merge : std::vector<double> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
+#pragma omp declare reduction(merge : std::vector<int> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
 // SPAD class with space charge effect
 class SPAD {
  private:
@@ -55,8 +57,10 @@ class SPAD {
     std::uniform_real_distribution<double> m_dist{0.0, 1.0};
 
     // Results
-    bool m_avalanche             = false;
-    bool m_succesufull_quenching = false;
+    bool   m_avalanche                 = false;
+    bool   m_succesufull_quenching     = false;
+    double m_time_successful_quenching = 0.0;
+    double m_time_avalanche            = 0.0;
 
  public:
     // Constructor with configurable parameters, including m_k_sc for space charge effect
@@ -107,6 +111,8 @@ class SPAD {
 
     bool hasAvalanche() const { return m_avalanche; }
     bool hasSuccesufullQuenching() const { return m_succesufull_quenching; }
+    double getTimeSuccessfulQuenching() const { return m_time_successful_quenching; }
+    double getTimeAvalanche() const { return m_time_avalanche; }
 
     // Calculate impact ionization rates based on the effective electric field
     std::pair<double, double> calculateImpactIonizationRates(double E) const {
@@ -194,6 +200,12 @@ class SPAD {
 
         double       Vbias               = m_V_BD + m_V_ex;
         const double RATIO_QUECH_SUCCESS = 0.999;
+        const double RATION_AVALANCHE    = 0.95;
+        // fmt::print("Avalanche condition: Vbias ({} V) - V_MR ({} V) >= {} * V_ex ({} V)\n",
+        //            Vbias,
+        //            m_V,
+        //            RATION_AVALANCHE,
+        //            m_V_ex);
 
         for (std::size_t step = 0; step < m_num_steps; ++step) {
             simulateTimeStep();
@@ -209,10 +221,11 @@ class SPAD {
                 break;
             }
             // Check for avalanche
-            if (!m_avalanche && (Vbias - m_V) >= 0.95 * m_V_ex) {
-                m_avalanche = true;
+            if (!m_avalanche && (Vbias - m_V) >= 0.5 * m_V_ex) {
+                m_avalanche      = true;
+                m_time_avalanche = step * m_dt;
             }
-            if (!m_avalanche && step >= static_cast<std::size_t>(m_num_steps * 0.1)) {
+            if (!m_avalanche && step >= static_cast<std::size_t>(m_num_steps * 0.3)) {
                 voltageHistory.resize(step + 1);
                 electronCountHistory.resize(step + 1);
                 electricFieldHistory.resize(step + 1);
@@ -220,13 +233,22 @@ class SPAD {
             }
             // Check for quenching success (voltage back to V_BD)
             if (m_avalanche && m_V >= RATIO_QUECH_SUCCESS * Vbias) {
+                // fmt::print("Simulation stopped: Quenching successful.\n");
                 m_succesufull_quenching = true;
                 voltageHistory.resize(step + 1);
                 electronCountHistory.resize(step + 1);
                 electricFieldHistory.resize(step + 1);
+                m_time_successful_quenching = step * m_dt;
                 break;
             }
         }
+
+        // Fill the beginning of the history with zeros for 1000 time steps added
+        // to the beginning of the simulation
+        const std::size_t initialSteps = 1000;
+        voltageHistory.insert(voltageHistory.begin(), initialSteps, voltageHistory[0]);
+        electronCountHistory.insert(electronCountHistory.begin(), initialSteps, 0.0);
+        electricFieldHistory.insert(electricFieldHistory.begin(), initialSteps, 0.0);
 
         // Write results to a CSV file
         std::ofstream outFile(outputFile);
@@ -270,8 +292,8 @@ int main(int argc, char* argv[]) {
     parser.add_argument("--alpha_p").default_value(1.75e6).help("Impact ionization coefficient for electrons (cm^-1)").scan<'g', double>();
     parser.add_argument("--beta_p").default_value(3.26e6).help("Impact ionization coefficient for holes (cm^-1)").scan<'g', double>();
     parser.add_argument("--eta").default_value(3.0).help("Bias parameter for electron generation locations").scan<'g', double>();
-    parser.add_argument("--dt").default_value(0.2e-12).help("Time step (s)").scan<'g', double>();
-    parser.add_argument("--num_steps").default_value(50000).help("Number of time steps").scan<'i', int>();
+    parser.add_argument("--dt").default_value(0.1e-12).help("Time step (s)").scan<'g', double>();
+    parser.add_argument("--num_steps").default_value(150000).help("Number of time steps").scan<'i', int>();
     parser.add_argument("--j").default_value(1).help("Nb thread").scan<'i', int>();
     parser.add_argument("--output_dir").default_value("simulation_results").help("Output directory name");
     parser.add_argument("--num_simulations").default_value(1).help("Number of simulations to run").scan<'i', int>();
@@ -307,7 +329,7 @@ int main(int argc, char* argv[]) {
         const int    num_steps = parser.get<int>("--num_steps");
         const int    nb_thread = parser.get<int>("--j");
         double       k_sc      = parser.get<double>("--k_sc");
-        k_sc                   = 0.0;
+        // k_sc                   = 0.0;
 
         // Format the output directory name using fmt::format for clarity.
         std::string outputDir = fmt::format("{}_C_{:.2e}_R_{:.2e}_Vex_{:.2f}_VB_{:.2f}_W_{:.2e}", baseOutputDir, C, R, V_ex, V_BD, W);
@@ -316,8 +338,10 @@ int main(int argc, char* argv[]) {
         // Run simulations (can be parallelized with OpenMP if desired)
         const int numSimulations = parser.get<int>("--num_simulations");
 
-        int              nb_avalanche             = 0;
-        int              nb_succesufull_quenching = 0;
+        int                 nb_avalanche             = 0;
+        int                 nb_succesufull_quenching = 0;
+        std::vector<double> quench_times;
+
         std::atomic<int> progressCounter{0};
 
 #pragma omp parallel for num_threads(nb_thread) reduction(+ : nb_avalanche) reduction(+ : nb_succesufull_quenching)
@@ -329,6 +353,9 @@ int main(int argc, char* argv[]) {
 
             if (spad.hasAvalanche()) {
                 nb_succesufull_quenching += spad.hasSuccesufullQuenching();
+                if (spad.hasSuccesufullQuenching()) {
+                    quench_times.push_back(spad.getTimeSuccessfulQuenching());
+                }
             }
             // Atomically update the progress counter
             int currentProgress = progressCounter.fetch_add(1) + 1;
@@ -361,16 +388,9 @@ int main(int argc, char* argv[]) {
         if (!outFile) {
             throw std::runtime_error("Failed to open output file: " + globalResultsFile);
         }
-        // outFile << "C (F) = " << C << "\n";
-        // outFile << "R (Ohms) = " << R << "\n";
-        // outFile << "RC (ns) = " << RC_ns << "\n";
-        // outFile << "V_bias (V) = " << V_BD + V_ex << "\n";
-        // outFile << "W (cm) = " << W << "\n";
-        // outFile << "Probability of avalanche = " << proba_avalanche << "\n";
-        // outFile << "Probability of succesufull quenching = " << proba_quenching << "\n";
-        // outFile.close();
         std::string globalResults = fmt::format(
-            "C (F) = {:.5e}\nR (Ohms) = {:.5e}\nRC (ns) = {:.2f}\nV_bias (V) = {}\nW (cm) = {:.2e}\nProbability of avalanche = {:.2f}\nProbability "
+            "C (F) = {:.5e}\nR (Ohms) = {:.5e}\nRC (ns) = {:.2f}\nV_bias (V) = {}\nW (cm) = {:.2e}\nProbability of avalanche = "
+            "{:.2f}\nProbability "
             "of succesufull quenching = {:.2f}\n",
             C,
             R,
@@ -380,7 +400,13 @@ int main(int argc, char* argv[]) {
             proba_avalanche,
             proba_quenching);
         outFile << globalResults;
+        outFile << "Quenching times (s):\n";
+        for (const auto& time : quench_times) {
+            outFile << time << "\n";
+        }
+
         outFile.close();
+        
 
         std::cout << "\n -------------------------------- \n";
 

@@ -104,7 +104,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/fmtlib/fmt.git
   GIT_TAG 9.1.0)
 
-find_package(fmt CONFIG QUIET)
+# find_package(fmt CONFIG QUIET)
 if(NOT fmt_FOUND)
   message("Fetching fmt lib ...")
   FetchContent_MakeAvailable(fmt)
