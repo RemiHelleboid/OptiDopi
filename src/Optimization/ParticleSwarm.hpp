@@ -14,6 +14,8 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <string>
+#include <algorithm>
 #include <random>
 #include <vector>
 
