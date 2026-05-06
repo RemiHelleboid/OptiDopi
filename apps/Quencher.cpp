@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+#include "Statistics.hpp"
 #include "argparse.hpp"
 
 namespace fs = std::filesystem;
@@ -298,12 +299,10 @@ class SPAD {
             m_result.avalanche_time = time;
         }
 
-        if (m_result.avalanche && !m_result.quenched && 
-            total_carriers <= m_parameters.extinction_carrier_threshold) {
+        if (m_result.avalanche && !m_result.quenched && total_carriers <= m_parameters.extinction_carrier_threshold) {
             m_result.quenched    = true;
             m_result.quench_time = time;
         }
-
     }
 
     void prependInitialHistory(std::vector<double>& voltage_history,
@@ -454,6 +453,15 @@ void writeGlobalResults(const std::string&          output_file,
     file << fmt::format("probability_quench_given_avalanche = {:.8f}\n", quench_probability);
     file << fmt::format("probability_recharge_given_quench = {:.8f}\n", recharge_probability);
 
+    double median_avalanche_time = std::numeric_limits<double>::quiet_NaN();
+    median_avalanche_time        = utils::median(avalanche_times);
+    double median_quench_time    = std::numeric_limits<double>::quiet_NaN();
+    median_quench_time           = utils::median(quench_times);
+    double median_recharge_time  = std::numeric_limits<double>::quiet_NaN();
+
+    file << fmt::format("median_avalanche_time_s = {:.6e}\n", median_avalanche_time);
+    file << fmt::format("median_quench_time_s = {:.6e}\n", median_quench_time);
+
     file << "\navalanche_times_s\n";
     for (const double time : avalanche_times) {
         fmt::print(file, "{:.6e}\n", time);
@@ -579,6 +587,16 @@ int main(int argc, char* argv[]) {
         fmt::print("Probability of quenching after avalanche: {:.6f} ({}/{})\n", quench_probability, quench_count, avalanche_count);
         fmt::print("Probability of recharge after quench: {:.6f} ({}/{})\n", recharge_probability, recharge_count, quench_count);
         fmt::print("Stopped by carrier limit: {}\n", carrier_limit_count);
+
+        double median_avalanche_time = std::numeric_limits<double>::quiet_NaN();
+        median_avalanche_time        = utils::median(avalanche_times);
+        double median_quench_time    = std::numeric_limits<double>::quiet_NaN();
+        median_quench_time           = utils::median(quench_times);
+        double median_recharge_time  = std::numeric_limits<double>::quiet_NaN();
+
+        fmt::print("Median avalanche time: {:.6e} s\n", median_avalanche_time);
+        fmt::print("Median quench time: {:.6e} s\n", median_quench_time);
+        fmt::print("Median recharge time: {:.6e} s\n", median_recharge_time);
 
         const std::string global_results_file = output_dir + "/global_results.txt";
         writeGlobalResults(global_results_file,
