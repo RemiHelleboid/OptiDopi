@@ -3,11 +3,15 @@ cmake_minimum_required(VERSION 3.15...3.23)
 include(FetchContent)
 include(CheckCXXCompilerFlag)
 include(CMakePrintHelpers)
+include(cmake/CPM.cmake)
+
 
 project(
   OptiDopti
   VERSION 0.0.0
   LANGUAGES CXX)
+
+
 
 macro(opt OPTION HELP VALUE)
   option(ENABLE_${OPTION} ${HELP} ${VALUE})
@@ -84,7 +88,22 @@ if(NOT Eigen3_FOUND)
   set(EIGEN_BUILD_PKGCONFIG OFF)
   message("Fetching Eigen3 lib ...")
   add_compile_definitions(EIGEN_USE_LAPACKE=0)
-  FetchContent_MakeAvailable(Eigen)
+
+  # Eigen (pin release)
+  CPMAddPackage(
+    NAME Eigen
+    VERSION 5.0.0
+    URL https://gitlab.com/libeigen/eigen/-/archive/5.0.0/eigen-5.0.0.tar.gz
+
+    # Eigen's CMakelists are not intended for library use
+    DOWNLOAD_ONLY YES
+  )
+
+  if(Eigen_ADDED)
+    add_library(Eigen3::Eigen INTERFACE IMPORTED)
+    target_include_directories(Eigen3::Eigen INTERFACE ${Eigen_SOURCE_DIR})
+  endif()
+
 endif()
 
 FetchContent_Declare(
