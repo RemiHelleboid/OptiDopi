@@ -90,7 +90,7 @@ endif()
 FetchContent_Declare(
   DocTest
   GIT_REPOSITORY "https://github.com/onqtam/doctest"
-  GIT_TAG "4d8716f1efc1d14aa736ef52ee727bd4204f4c40"
+  GIT_TAG "d44d4f6e66232d716af82f00a063759e9d0e50d6"
 )
 FetchContent_MakeAvailable(DocTest)
 
