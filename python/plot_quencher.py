@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy.ndimage import gaussian_filter1d
 
 
@@ -71,41 +72,17 @@ def plot_quencher(dirname, max_files=100, smoothing_sigma=111):
     plt.show(block=False)
 
 
-def read_global_results_sections(dirname):
-    path = os.path.join(dirname, "global_results.txt")
-
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Missing file: {path}")
-
-    sections = {}
-    current_section = None
-
-    with open(path, "r", encoding="utf-8") as file:
-        for raw_line in file:
-            line = raw_line.strip()
-
-            if not line:
-                continue
-
-            if line in {"avalanche_times_s", "quench_times_s", "recharge_times_s"}:
-                current_section = line
-                sections[current_section] = []
-                continue
-
-            if current_section is None:
-                continue
-
-            try:
-                sections[current_section].append(float(line))
-            except ValueError:
-                pass
-
-    return {key: np.array(values, dtype=float) for key, values in sections.items()}
-
 
 def time_distribution(dirname, section_name):
-    sections = read_global_results_sections(dirname)
-    return sections.get(section_name, np.array([], dtype=float))
+    file = os.path.join(dirname, f"summary.csv")
+    if not os.path.isfile(file):
+        print(f"Warning: {file} not found. Skipping time distribution for {section_name}.")
+        return np.array([])
+    dataset = pd.read_csv(file)
+    if section_name not in dataset.columns:
+        print(f"Warning: {section_name} not found in {file}. Skipping time distribution.")
+        return np.array([])
+    return dataset[section_name].dropna().values
 
 
 def plot_time_distribution(dirname, section_name, title, xlabel, output_name):
@@ -131,7 +108,7 @@ def plot_time_distribution(dirname, section_name, title, xlabel, output_name):
 def plot_event_distributions(dirname):
     plot_time_distribution(
         dirname=dirname,
-        section_name="avalanche_times_s",
+        section_name="avalanche_time_s",
         title="Avalanche time distribution",
         xlabel="Avalanche time (s)",
         output_name="avalanche_time_distribution.png",
@@ -139,7 +116,7 @@ def plot_event_distributions(dirname):
 
     plot_time_distribution(
         dirname=dirname,
-        section_name="quench_times_s",
+        section_name="quench_time_s",
         title="Quench time distribution",
         xlabel="Quench time (s)",
         output_name="quench_time_distribution.png",
@@ -147,7 +124,7 @@ def plot_event_distributions(dirname):
 
     plot_time_distribution(
         dirname=dirname,
-        section_name="recharge_times_s",
+        section_name="recharge_time_s",
         title="Recharge time distribution",
         xlabel="Recharge time (s)",
         output_name="recharge_time_distribution.png",
@@ -160,6 +137,6 @@ if __name__ == "__main__":
 
     output_dir = sys.argv[1]
 
-    plot_quencher(output_dir)
-    plot_event_distributions(output_dir)
+    plot_quencher(f"{output_dir}/traces/")
+    plot_event_distributions(f"{output_dir}/")
     plt.show(block=True)

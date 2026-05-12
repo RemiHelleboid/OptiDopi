@@ -8,8 +8,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -23,8 +26,6 @@
 #include "argparse.hpp"
 
 namespace fs = std::filesystem;
-
-#pragma omp declare reduction(merge_double_vector : std::vector<double> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))
 
 struct SimulationParameters {
     double      q                            = 1.6e-19;
@@ -50,13 +51,33 @@ struct SimulationParameters {
 };
 
 struct SimulationResult {
-    bool   avalanche                = false;
-    bool   quenched                 = false;
-    bool   recharged                = false;
-    bool   stopped_by_carrier_limit = false;
-    double avalanche_time           = std::numeric_limits<double>::quiet_NaN();
-    double quench_time              = std::numeric_limits<double>::quiet_NaN();
-    double recharge_time            = std::numeric_limits<double>::quiet_NaN();
+    bool avalanche                = false;
+    bool quenched                 = false;
+    bool recharged                = false;
+    bool stopped_by_carrier_limit = false;
+
+    double avalanche_time = std::numeric_limits<double>::quiet_NaN();
+    double quench_time    = std::numeric_limits<double>::quiet_NaN();
+    double recharge_time  = std::numeric_limits<double>::quiet_NaN();
+
+    double final_time           = 0.0;
+    double final_voltage        = 0.0;
+    double final_electric_field = 0.0;
+
+    std::size_t final_electron_count      = 0;
+    std::size_t final_hole_count          = 0;
+    std::size_t final_total_carrier_count = 0;
+};
+
+struct OutputPaths {
+    std::string root;
+    std::string traces;
+    std::string plots;
+    std::string parameters_csv;
+    std::string summary_csv;
+    std::string event_times_csv;
+    std::string aggregate_results_csv;
+    std::string run_info_txt;
 };
 
 class SPAD {
@@ -68,6 +89,7 @@ class SPAD {
           m_electric_field(m_bias_voltage / parameters.width),
           m_rng(seed) {
         validateParameters();
+
         const double initial_position = sampleInitialPosition();
         m_electrons.push_back(initial_position);
         m_holes.push_back(initial_position);
@@ -88,6 +110,8 @@ class SPAD {
         electric_field_history.reserve(m_parameters.num_steps);
         avalanche_current_history.reserve(m_parameters.num_steps);
 
+        std::size_t last_step = 0;
+
         for (std::size_t step = 0; step < m_parameters.num_steps; ++step) {
             const StepResult step_result = simulateStep();
             const double     time        = static_cast<double>(step) * m_parameters.dt;
@@ -98,7 +122,8 @@ class SPAD {
             electric_field_history.push_back(m_electric_field);
             avalanche_current_history.push_back(step_result.avalanche_current);
 
-            updateEventState(step, time);
+            updateEventState(time);
+            last_step = step;
 
             if (m_electrons.size() + m_holes.size() > m_parameters.max_carriers) {
                 m_result.stopped_by_carrier_limit = true;
@@ -113,6 +138,13 @@ class SPAD {
                 break;
             }
         }
+
+        m_result.final_time                = static_cast<double>(last_step) * m_parameters.dt;
+        m_result.final_voltage             = m_voltage;
+        m_result.final_electric_field      = m_electric_field;
+        m_result.final_electron_count      = m_electrons.size();
+        m_result.final_hole_count          = m_holes.size();
+        m_result.final_total_carrier_count = m_electrons.size() + m_holes.size();
 
         prependInitialHistory(voltage_history, electron_history, hole_history, electric_field_history, avalanche_current_history);
         writeCsv(output_file, voltage_history, electron_history, hole_history, electric_field_history, avalanche_current_history);
@@ -291,7 +323,7 @@ class SPAD {
         return StepResult{collected_electrons, avalanche_current};
     }
 
-    void updateEventState(std::size_t step, double time) {
+    void updateEventState(double time) {
         const std::size_t total_carriers = m_electrons.size() + m_holes.size();
 
         if (!m_result.avalanche && total_carriers >= m_parameters.avalanche_carrier_threshold) {
@@ -302,6 +334,11 @@ class SPAD {
         if (m_result.avalanche && !m_result.quenched && total_carriers <= m_parameters.extinction_carrier_threshold) {
             m_result.quenched    = true;
             m_result.quench_time = time;
+        }
+
+        if (m_result.quenched && !m_result.recharged && m_voltage >= m_parameters.recharge_ratio * m_bias_voltage) {
+            m_result.recharged     = true;
+            m_result.recharge_time = time;
         }
     }
 
@@ -343,7 +380,44 @@ class SPAD {
     }
 };
 
-void createDirectory(const std::string& directory) { fs::create_directories(directory); }
+std::string makeRunId() {
+    const auto now          = std::chrono::system_clock::now();
+    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    return std::to_string(milliseconds);
+}
+
+std::string makeUniqueOutputDirectory(const std::string& base_output_dir) {
+    const std::string run_id = makeRunId();
+
+    for (int suffix = 0; suffix < 1000; ++suffix) {
+        const std::string directory =
+            suffix == 0 ? fmt::format("{}/run_{}", base_output_dir, run_id) : fmt::format("{}/run_{}_{}", base_output_dir, run_id, suffix);
+
+        if (!fs::exists(directory)) {
+            return directory;
+        }
+    }
+
+    throw std::runtime_error("Failed to create a unique output directory name.");
+}
+
+OutputPaths createOutputLayout(const std::string& root) {
+    OutputPaths paths;
+    paths.root                  = root;
+    paths.traces                = root + "/traces";
+    paths.plots                 = root + "/plots";
+    paths.parameters_csv        = root + "/parameters.csv";
+    paths.summary_csv           = root + "/summary.csv";
+    paths.event_times_csv       = root + "/event_times.csv";
+    paths.aggregate_results_csv = root + "/aggregate_results.csv";
+    paths.run_info_txt          = root + "/run_info.txt";
+
+    fs::create_directories(paths.root);
+    fs::create_directories(paths.traces);
+    fs::create_directories(paths.plots);
+
+    return paths;
+}
 
 SimulationParameters parseSimulationParameters(argparse::ArgumentParser& parser) {
     SimulationParameters parameters;
@@ -416,66 +490,262 @@ void addArguments(argparse::ArgumentParser& parser) {
     parser.add_argument("-p", "--plot").default_value(false).implicit_value(true).help("Plot results with the Python script");
 }
 
-void writeGlobalResults(const std::string&          output_file,
-                        const SimulationParameters& parameters,
-                        int                         num_simulations,
-                        int                         avalanche_count,
-                        int                         quench_count,
-                        int                         recharge_count,
-                        int                         carrier_limit_count,
-                        const std::vector<double>&  avalanche_times,
-                        const std::vector<double>&  quench_times,
-                        const std::vector<double>&  recharge_times) {
+double safeRatio(int numerator, int denominator) {
+    if (denominator <= 0) {
+        return 0.0;
+    }
+
+    return static_cast<double>(numerator) / static_cast<double>(denominator);
+}
+
+std::vector<double> collectEventTimes(const std::vector<SimulationResult>& results, const std::string& event_name) {
+    std::vector<double> times;
+    times.reserve(results.size());
+
+    for (const SimulationResult& result : results) {
+        if (event_name == "avalanche" && result.avalanche) {
+            times.push_back(result.avalanche_time);
+        } else if (event_name == "quench" && result.quenched) {
+            times.push_back(result.quench_time);
+        } else if (event_name == "recharge" && result.recharged) {
+            times.push_back(result.recharge_time);
+        }
+    }
+
+    return times;
+}
+
+int countAvalanches(const std::vector<SimulationResult>& results) {
+    return static_cast<int>(std::count_if(results.begin(), results.end(), [](const SimulationResult& result) { return result.avalanche; }));
+}
+
+int countQuenches(const std::vector<SimulationResult>& results) {
+    return static_cast<int>(std::count_if(results.begin(), results.end(), [](const SimulationResult& result) { return result.quenched; }));
+}
+
+int countRecharges(const std::vector<SimulationResult>& results) {
+    return static_cast<int>(std::count_if(results.begin(), results.end(), [](const SimulationResult& result) { return result.recharged; }));
+}
+
+int countCarrierLimitStops(const std::vector<SimulationResult>& results) {
+    return static_cast<int>(
+        std::count_if(results.begin(), results.end(), [](const SimulationResult& result) { return result.stopped_by_carrier_limit; }));
+}
+
+void writeParametersCsv(const std::string& output_file, const SimulationParameters& parameters) {
     std::ofstream file(output_file);
     if (!file) {
         throw std::runtime_error("Failed to open output file: " + output_file);
     }
 
-    const double avalanche_probability =
-        num_simulations > 0 ? static_cast<double>(avalanche_count) / static_cast<double>(num_simulations) : 0.0;
-    const double quench_probability = avalanche_count > 0 ? static_cast<double>(quench_count) / static_cast<double>(avalanche_count) : 0.0;
-    const double recharge_probability = quench_count > 0 ? static_cast<double>(recharge_count) / static_cast<double>(quench_count) : 0.0;
+    const double bias_voltage = parameters.breakdown_voltage + parameters.excess_voltage;
+    const double rc           = parameters.resistance * parameters.capacitance;
 
-    file << fmt::format("C (F) = {:.5e}\n", parameters.capacitance);
-    file << fmt::format("R (Ohms) = {:.5e}\n", parameters.resistance);
-    file << fmt::format("RC (ns) = {:.5f}\n", parameters.resistance * parameters.capacitance * 1e9);
-    file << fmt::format("V_bias (V) = {:.8g}\n", parameters.breakdown_voltage + parameters.excess_voltage);
-    file << fmt::format("V_BD (V) = {:.8g}\n", parameters.breakdown_voltage);
-    file << fmt::format("V_ex (V) = {:.8g}\n", parameters.excess_voltage);
-    file << fmt::format("W (cm) = {:.5e}\n", parameters.width);
-    file << fmt::format("dt (s) = {:.5e}\n", parameters.dt);
+    file << "name,value,unit,description\n";
+    file << fmt::format("q,{:.12e},C,Elementary charge\n", parameters.q);
+    file << fmt::format("electron_velocity,{:.12e},cm/s,Electron saturation velocity\n", parameters.electron_velocity);
+    file << fmt::format("hole_velocity,{:.12e},cm/s,Hole saturation velocity\n", parameters.hole_velocity);
+    file << fmt::format("width,{:.12e},cm,Multiplication-region width\n", parameters.width);
+    file << fmt::format("breakdown_voltage,{:.12e},V,Breakdown voltage\n", parameters.breakdown_voltage);
+    file << fmt::format("excess_voltage,{:.12e},V,Excess voltage\n", parameters.excess_voltage);
+    file << fmt::format("bias_voltage,{:.12e},V,Bias voltage\n", bias_voltage);
+    file << fmt::format("capacitance,{:.12e},F,Capacitance\n", parameters.capacitance);
+    file << fmt::format("resistance,{:.12e},Ohm,Quenching resistance\n", parameters.resistance);
+    file << fmt::format("rc_time_constant,{:.12e},s,RC time constant\n", rc);
+    file << fmt::format("alpha_0,{:.12e},cm^-1,Electron ionization prefactor\n", parameters.alpha_0);
+    file << fmt::format("beta_0,{:.12e},cm^-1,Hole ionization prefactor\n", parameters.beta_0);
+    file << fmt::format("alpha_p,{:.12e},V/cm,Electron ionization critical-field parameter\n", parameters.alpha_p);
+    file << fmt::format("beta_p,{:.12e},V/cm,Hole ionization critical-field parameter\n", parameters.beta_p);
+    file << fmt::format("eta,{:.12e},,Initial generation-position bias parameter\n", parameters.eta);
+    file << fmt::format("dt,{:.12e},s,Time step\n", parameters.dt);
+    file << fmt::format("num_steps,{},,Maximum number of time steps\n", parameters.num_steps);
+    file << fmt::format("space_charge_coefficient,{:.12e},V cm/C,Empirical space-charge coefficient\n",
+                        parameters.space_charge_coefficient);
+    file << fmt::format("avalanche_carrier_threshold,{},,Avalanche carrier threshold\n", parameters.avalanche_carrier_threshold);
+    file << fmt::format("extinction_carrier_threshold,{},,Extinction carrier threshold\n", parameters.extinction_carrier_threshold);
+    file << fmt::format("max_carriers,{},,Maximum carrier count\n", parameters.max_carriers);
+    file << fmt::format("recharge_ratio,{:.12e},,Recharge voltage ratio\n", parameters.recharge_ratio);
+}
+
+void writeSummaryCsv(const std::string& output_file, const std::vector<SimulationResult>& results) {
+    std::ofstream file(output_file);
+    if (!file) {
+        throw std::runtime_error("Failed to open output file: " + output_file);
+    }
+
+    file << "simulation_id,avalanche,quenched,recharged,stopped_by_carrier_limit,"
+            "avalanche_time_s,quench_time_s,recharge_time_s,"
+            "final_time_s,final_voltage_v,final_electric_field_v_per_cm,"
+            "final_electron_count,final_hole_count,final_total_carrier_count\n";
+
+    for (std::size_t i = 0; i < results.size(); ++i) {
+        const SimulationResult& result = results[i];
+
+        file << (i + 1) << ',' << static_cast<int>(result.avalanche) << ',' << static_cast<int>(result.quenched) << ','
+             << static_cast<int>(result.recharged) << ',' << static_cast<int>(result.stopped_by_carrier_limit) << ','
+             << result.avalanche_time << ',' << result.quench_time << ',' << result.recharge_time << ',' << result.final_time << ','
+             << result.final_voltage << ',' << result.final_electric_field << ',' << result.final_electron_count << ','
+             << result.final_hole_count << ',' << result.final_total_carrier_count << '\n';
+    }
+}
+
+void writeEventTimesCsv(const std::string& output_file, const std::vector<SimulationResult>& results) {
+    std::ofstream file(output_file);
+    if (!file) {
+        throw std::runtime_error("Failed to open output file: " + output_file);
+    }
+
+    file << "simulation_id,event,time_s\n";
+
+    for (std::size_t i = 0; i < results.size(); ++i) {
+        const SimulationResult& result = results[i];
+        const std::size_t       id     = i + 1;
+
+        bool wrote_event = false;
+
+        if (result.avalanche) {
+            file << id << ",avalanche," << result.avalanche_time << '\n';
+            wrote_event = true;
+        }
+        if (result.quenched) {
+            file << id << ",quench," << result.quench_time << '\n';
+            wrote_event = true;
+        }
+        if (result.recharged) {
+            file << id << ",recharge," << result.recharge_time << '\n';
+            wrote_event = true;
+        }
+        if (!wrote_event) {
+            file << id << ",none,nan\n";
+        }
+    }
+}
+
+void writeAggregateResultsCsv(const std::string& output_file, const std::vector<SimulationResult>& results) {
+    std::ofstream file(output_file);
+    if (!file) {
+        throw std::runtime_error("Failed to open output file: " + output_file);
+    }
+
+    const int    num_simulations     = static_cast<int>(results.size());
+    const int    avalanche_count     = countAvalanches(results);
+    const int    quench_count        = countQuenches(results);
+    const int    recharge_count      = countRecharges(results);
+    const int    carrier_limit_count = countCarrierLimitStops(results);
+    const double p_avalanche         = safeRatio(avalanche_count, num_simulations);
+    const double p_quench            = safeRatio(quench_count, avalanche_count);
+    const double p_recharge          = safeRatio(recharge_count, quench_count);
+
+    std::vector<double> avalanche_times = collectEventTimes(results, "avalanche");
+    std::vector<double> quench_times    = collectEventTimes(results, "quench");
+    std::vector<double> recharge_times  = collectEventTimes(results, "recharge");
+
+    if (avalanche_times.empty()) {
+        avalanche_times.push_back(std::numeric_limits<double>::quiet_NaN());
+    }
+    if (quench_times.empty()) {
+        quench_times.push_back(std::numeric_limits<double>::quiet_NaN());
+    }
+    if (recharge_times.empty()) {
+        recharge_times.push_back(std::numeric_limits<double>::quiet_NaN());
+    }
+    const double median_avalanche_time = utils::median(avalanche_times);
+    const double median_quench_time    = utils::median(quench_times);
+    const double median_recharge_time  = utils::median(recharge_times);
+
+    file << "metric,value\n";
+    file << fmt::format("num_simulations,{}\n", num_simulations);
+    file << fmt::format("avalanche_count,{}\n", avalanche_count);
+    file << fmt::format("quench_count,{}\n", quench_count);
+    file << fmt::format("recharge_count,{}\n", recharge_count);
+    file << fmt::format("carrier_limit_count,{}\n", carrier_limit_count);
+    file << fmt::format("probability_avalanche,{:.12e}\n", p_avalanche);
+    file << fmt::format("probability_quench_given_avalanche,{:.12e}\n", p_quench);
+    file << fmt::format("probability_recharge_given_quench,{:.12e}\n", p_recharge);
+    file << fmt::format("median_avalanche_time_s,{:.12e}\n", median_avalanche_time);
+    file << fmt::format("median_quench_time_s,{:.12e}\n", median_quench_time);
+    file << fmt::format("median_recharge_time_s,{:.12e}\n", median_recharge_time);
+}
+
+void writeRunInfo(const std::string& output_file, int argc, char* argv[], int num_simulations, int num_threads) {
+    std::ofstream file(output_file);
+    if (!file) {
+        throw std::runtime_error("Failed to open output file: " + output_file);
+    }
+
+    const auto now = std::chrono::system_clock::now();
+
+    file << fmt::format("run_time = {:%Y-%m-%d %H:%M:%S}\n", now);
     file << fmt::format("num_simulations = {}\n", num_simulations);
-    file << fmt::format("avalanche_count = {}\n", avalanche_count);
-    file << fmt::format("quench_count = {}\n", quench_count);
-    file << fmt::format("recharge_count = {}\n", recharge_count);
-    file << fmt::format("carrier_limit_count = {}\n", carrier_limit_count);
-    file << fmt::format("probability_avalanche = {:.8f}\n", avalanche_probability);
-    file << fmt::format("probability_quench_given_avalanche = {:.8f}\n", quench_probability);
-    file << fmt::format("probability_recharge_given_quench = {:.8f}\n", recharge_probability);
+    file << fmt::format("num_threads = {}\n", num_threads);
+    file << "command =";
 
-    double median_avalanche_time = std::numeric_limits<double>::quiet_NaN();
-    median_avalanche_time        = utils::median(avalanche_times);
-    double median_quench_time    = std::numeric_limits<double>::quiet_NaN();
-    median_quench_time           = utils::median(quench_times);
-    double median_recharge_time  = std::numeric_limits<double>::quiet_NaN();
-
-    file << fmt::format("median_avalanche_time_s = {:.6e}\n", median_avalanche_time);
-    file << fmt::format("median_quench_time_s = {:.6e}\n", median_quench_time);
-
-    file << "\navalanche_times_s\n";
-    for (const double time : avalanche_times) {
-        fmt::print(file, "{:.6e}\n", time);
+    for (int i = 0; i < argc; ++i) {
+        file << ' ' << argv[i];
     }
 
-    file << "\nquench_times_s\n";
-    for (const double time : quench_times) {
-        fmt::print(file, "{:.6e}\n", time);
+    file << '\n';
+}
+
+void printConsoleSummary(const SimulationParameters&          parameters,
+                         const std::vector<SimulationResult>& results,
+                         const std::string&                   output_dir) {
+    const int num_simulations     = static_cast<int>(results.size());
+    const int avalanche_count     = countAvalanches(results);
+    const int quench_count        = countQuenches(results);
+    const int recharge_count      = countRecharges(results);
+    const int carrier_limit_count = countCarrierLimitStops(results);
+
+    const double avalanche_probability = safeRatio(avalanche_count, num_simulations);
+    const double quench_probability    = safeRatio(quench_count, avalanche_count);
+    const double recharge_probability  = safeRatio(recharge_count, quench_count);
+    const double rc_ns                 = parameters.resistance * parameters.capacitance * 1e9;
+
+    std::vector<double> avalanche_times = collectEventTimes(results, "avalanche");
+    std::vector<double> quench_times    = collectEventTimes(results, "quench");
+    std::vector<double> recharge_times  = collectEventTimes(results, "recharge");
+
+    if (avalanche_times.empty()) {
+        avalanche_times.push_back(std::numeric_limits<double>::quiet_NaN());
+    }
+    if (quench_times.empty()) {
+        quench_times.push_back(std::numeric_limits<double>::quiet_NaN());
+    }
+    if (recharge_times.empty()) {
+        recharge_times.push_back(std::numeric_limits<double>::quiet_NaN());
     }
 
-    file << "\nrecharge_times_s\n";
-    for (const double time : recharge_times) {
-        fmt::print(file, "{:.6e}\n", time);
-    }
+    const double median_avalanche_time = utils::median(avalanche_times);
+    const double median_quench_time    = utils::median(quench_times);
+    const double median_recharge_time  = utils::median(recharge_times);
+
+    std::cout << "\n\n";
+    fmt::print("C = {:.2e}, R = {:.2e}, RC = {:.2f} ns, V_bias = {:.8g} V, W = {:.2e} cm\n",
+               parameters.capacitance,
+               parameters.resistance,
+               rc_ns,
+               parameters.breakdown_voltage + parameters.excess_voltage,
+               parameters.width);
+    fmt::print("Results saved in directory: {}\n", output_dir);
+    fmt::print("Probability of avalanche: {:.6f} ({}/{})\n", avalanche_probability, avalanche_count, num_simulations);
+    fmt::print("Probability of quenching after avalanche: {:.6f} ({}/{})\n", quench_probability, quench_count, avalanche_count);
+    fmt::print("Probability of recharge after quench: {:.6f} ({}/{})\n", recharge_probability, recharge_count, quench_count);
+    fmt::print("Stopped by carrier limit: {}\n", carrier_limit_count);
+    fmt::print("Median avalanche time: {:.6e} s\n", median_avalanche_time);
+    fmt::print("Median quench time: {:.6e} s\n", median_quench_time);
+    fmt::print("Median recharge time: {:.6e} s\n", median_recharge_time);
+}
+
+std::uint32_t makeSeed(int simulation_index) {
+    std::random_device random_device;
+    std::seed_seq      seed_sequence{random_device(),
+                                     random_device(),
+                                     static_cast<std::uint32_t>(simulation_index),
+                                     static_cast<std::uint32_t>(omp_get_thread_num())};
+
+    std::vector<std::uint32_t> seed_data(1);
+    seed_sequence.generate(seed_data.begin(), seed_data.end());
+    return seed_data.front();
 }
 
 int main(int argc, char* argv[]) {
@@ -502,60 +772,21 @@ int main(int argc, char* argv[]) {
             throw std::invalid_argument("--j must be positive.");
         }
 
-        const std::string output_dir = fmt::format("{}_C_{:.2e}_R_{:.2e}_Vex_{:.2f}_VB_{:.2f}_W_{:.2e}",
-                                                   base_output_dir,
-                                                   parameters.capacitance,
-                                                   parameters.resistance,
-                                                   parameters.excess_voltage,
-                                                   parameters.breakdown_voltage,
-                                                   parameters.width);
+        const std::string output_dir = makeUniqueOutputDirectory(base_output_dir);
 
-        createDirectory(output_dir);
+        const OutputPaths             paths = createOutputLayout(output_dir);
+        std::vector<SimulationResult> results(static_cast<std::size_t>(num_simulations));
+        std::atomic<int>              progress_counter{0};
 
-        int avalanche_count     = 0;
-        int quench_count        = 0;
-        int recharge_count      = 0;
-        int carrier_limit_count = 0;
-
-        std::vector<double> avalanche_times;
-        std::vector<double> quench_times;
-        std::vector<double> recharge_times;
-
-        std::atomic<int> progress_counter{0};
-
-#pragma omp parallel for num_threads(num_threads) reduction(+ : avalanche_count) reduction(+ : quench_count) reduction(+ : recharge_count) \
-    reduction(+ : carrier_limit_count) reduction(merge_double_vector : avalanche_times) reduction(merge_double_vector : quench_times)      \
-    reduction(merge_double_vector : recharge_times)
+#pragma omp parallel for num_threads(num_threads)
         for (int i = 0; i < num_simulations; ++i) {
-            std::random_device random_device;
-            std::seed_seq      seed_sequence{random_device(),
-                                             random_device(),
-                                             static_cast<std::uint32_t>(i),
-                                             static_cast<std::uint32_t>(omp_get_thread_num())};
+            const std::uint32_t seed        = makeSeed(i);
+            const std::string   output_file = fmt::format("{}/simulation_{:06d}.csv", paths.traces, i + 1);
 
-            std::vector<std::uint32_t> seed_data(1);
-            seed_sequence.generate(seed_data.begin(), seed_data.end());
-
-            SPAD              spad(parameters, seed_data.front());
-            const std::string output_file = output_dir + "/simulation_" + std::to_string(i + 1) + ".csv";
+            SPAD spad(parameters, seed);
             spad.run(output_file);
 
-            const SimulationResult& result = spad.result();
-
-            avalanche_count += result.avalanche ? 1 : 0;
-            quench_count += result.quenched ? 1 : 0;
-            recharge_count += result.recharged ? 1 : 0;
-            carrier_limit_count += result.stopped_by_carrier_limit ? 1 : 0;
-
-            if (result.avalanche) {
-                avalanche_times.push_back(result.avalanche_time);
-            }
-            if (result.quenched) {
-                quench_times.push_back(result.quench_time);
-            }
-            if (result.recharged) {
-                recharge_times.push_back(result.recharge_time);
-            }
+            results[static_cast<std::size_t>(i)] = spad.result();
 
             const int current_progress = progress_counter.fetch_add(1) + 1;
             if (current_progress % 10 == 0 || current_progress == num_simulations) {
@@ -567,48 +798,13 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        const double avalanche_probability = static_cast<double>(avalanche_count) / static_cast<double>(num_simulations);
-        const double quench_probability =
-            avalanche_count > 0 ? static_cast<double>(quench_count) / static_cast<double>(avalanche_count) : 0.0;
-        const double recharge_probability =
-            quench_count > 0 ? static_cast<double>(recharge_count) / static_cast<double>(quench_count) : 0.0;
+        writeParametersCsv(paths.parameters_csv, parameters);
+        writeSummaryCsv(paths.summary_csv, results);
+        writeEventTimesCsv(paths.event_times_csv, results);
+        writeAggregateResultsCsv(paths.aggregate_results_csv, results);
+        writeRunInfo(paths.run_info_txt, argc, argv, num_simulations, num_threads);
 
-        const double rc_ns = parameters.resistance * parameters.capacitance * 1e9;
-
-        std::cout << "\n\n";
-        fmt::print("C = {:.2e}, R = {:.2e}, RC = {:.2f} ns, V_bias = {:.8g} V, W = {:.2e} cm\n",
-                   parameters.capacitance,
-                   parameters.resistance,
-                   rc_ns,
-                   parameters.breakdown_voltage + parameters.excess_voltage,
-                   parameters.width);
-        fmt::print("Results saved in directory: {}\n", output_dir);
-        fmt::print("Probability of avalanche: {:.6f} ({}/{})\n", avalanche_probability, avalanche_count, num_simulations);
-        fmt::print("Probability of quenching after avalanche: {:.6f} ({}/{})\n", quench_probability, quench_count, avalanche_count);
-        fmt::print("Probability of recharge after quench: {:.6f} ({}/{})\n", recharge_probability, recharge_count, quench_count);
-        fmt::print("Stopped by carrier limit: {}\n", carrier_limit_count);
-
-        double median_avalanche_time = std::numeric_limits<double>::quiet_NaN();
-        median_avalanche_time        = utils::median(avalanche_times);
-        double median_quench_time    = std::numeric_limits<double>::quiet_NaN();
-        median_quench_time           = utils::median(quench_times);
-        double median_recharge_time  = std::numeric_limits<double>::quiet_NaN();
-
-        fmt::print("Median avalanche time: {:.6e} s\n", median_avalanche_time);
-        fmt::print("Median quench time: {:.6e} s\n", median_quench_time);
-        fmt::print("Median recharge time: {:.6e} s\n", median_recharge_time);
-
-        const std::string global_results_file = output_dir + "/global_results.txt";
-        writeGlobalResults(global_results_file,
-                           parameters,
-                           num_simulations,
-                           avalanche_count,
-                           quench_count,
-                           recharge_count,
-                           carrier_limit_count,
-                           avalanche_times,
-                           quench_times,
-                           recharge_times);
+        printConsoleSummary(parameters, results, output_dir);
 
         std::cout << "\n -------------------------------- \n";
 
